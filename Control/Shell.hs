@@ -320,7 +320,7 @@ withTempDirectory template act = Shell $ \env -> do
 -- | Performs a command inside a temporary directory. The directory will be
 --   cleaned up after the command finishes.
 inTempDirectory :: Shell a -> Shell a
-inTempDirectory = withTempDirectory "hsshell" . flip inDirectory
+inTempDirectory = withTempDirectory "shellmate" . flip inDirectory
 
 -- | Create a temp file in the standard system temp directory, do something
 --   with it, then remove it.
