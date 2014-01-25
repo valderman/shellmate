@@ -10,7 +10,7 @@ module Control.Shell (
     isFile, rm, mv, cp, file,
     withTempFile, withTempDirectory, inTempDirectory,
     hPutStr, hPutStrLn, echo,
-    module System.FilePath,
+    module System.FilePath, liftIO
   ) where
 import Control.Applicative
 import Control.Monad (ap)
