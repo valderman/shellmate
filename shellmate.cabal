@@ -17,7 +17,7 @@ library
     Control.Shell
   -- other-modules:       
   build-depends:
-    base >=4.6 && <5,
+    base >=4.5 && <5,
     transformers >=0.3,
     time >=1.4,
     filepath >=1.3,
