@@ -1,8 +1,12 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable,
+             MultiParamTypeClasses, FunctionalDependencies,
+             UndecidableInstances #-}
 -- | Simple interface for shell scripting-like tasks.
 module Control.Shell ( 
-    Shell, shell,
-    mayFail, orElse, guard,
+    Shell,
+    Guard (..),
+    shell,
+    mayFail, orElse,
     withEnv, getEnv, lookupEnv,
     run, run_, runInteractive, sudo,
     cd, cpDir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,
@@ -361,12 +365,19 @@ hPutStrLn h s = liftIO $ IO.hPutStrLn h s
 echo :: String -> Shell ()
 echo = liftIO . putStrLn
 
--- | Perform a Shell computation; if the computation succeeds but returns
---   Nothing, the outer Shell computation fails with the given error message.
---   If the inner computation returns Just x, x is returned.
-guard :: String -> Shell (Maybe a) -> Shell a
-guard desc m = do
-  mx <- m
-  case mx of
-    Just x -> return x
-    _      -> fail $ "Guard failed: " ++ desc
+class Guard guard a | guard -> a where
+  -- | Perform a Shell computation; if the computation succeeds but returns
+  --   a false-ish value, the outer Shell computation fails with the given
+  --   error message.
+  guard :: String -> guard -> Shell a
+
+instance Guard (Maybe a) a where
+  guard _ (Just x) = return x
+  guard desc _     = fail $ "Guard failed: " ++ desc
+
+instance Guard Bool () where
+  guard _ True = return ()
+  guard desc _ = fail $ "Guard failed: " ++ desc
+
+instance Guard a b => Guard (Shell a) b where
+  guard desc m = m >>= \x -> guard desc x
