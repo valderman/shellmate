@@ -2,7 +2,7 @@
 -- | Simple interface for shell scripting-like tasks.
 module Control.Shell ( 
     Shell, shell,
-    mayFail, orElse,
+    mayFail, orElse, guard,
     withEnv, getEnv, lookupEnv,
     run, run_, runInteractive, sudo,
     cd, cpDir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,
@@ -360,3 +360,13 @@ hPutStrLn h s = liftIO $ IO.hPutStrLn h s
 -- | @putStrLn@ lifted into Shell for convenience.
 echo :: String -> Shell ()
 echo = liftIO . putStrLn
+
+-- | Perform a Shell computation; if the computation succeeds but returns
+--   Nothing, the outer Shell computation fails with the given error message.
+--   If the inner computation returns Just x, x is returned.
+guard :: String -> Shell (Maybe a) -> Shell a
+guard desc m = do
+  mx <- m
+  case mx of
+    Just x -> return x
+    _      -> fail $ "Guard failed: " ++ desc
