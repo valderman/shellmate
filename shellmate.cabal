@@ -1,5 +1,5 @@
 name:                shellmate
-version:             0.1.2
+version:             0.1.3
 synopsis:            Simple interface for shell scripting in Haskell.
 -- description:         
 homepage:            http://github.com/valderman/shellmate

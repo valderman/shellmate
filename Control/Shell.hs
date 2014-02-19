@@ -11,7 +11,7 @@ module Control.Shell (
     run, run_, runInteractive, genericRun, sudo,
     cd, cpDir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,
     withHomeDirectory, inHomeDirectory, withAppDirectory, inAppDirectory,
-    forEachFile, cpFilter,
+    forEachFile, cpFiltered,
     isFile, rm, mv, cp, file,
     withTempFile, withTempDirectory, inTempDirectory,
     hPutStr, hPutStrLn, echo,
@@ -300,7 +300,7 @@ cpFiltered pred from to = do
   mapM_ ((`cp` to') . (from </>)) (filter pred files)
   fromdirs <- filterM (\d -> isDirectory (from </> d)) files
   forM_ fromdirs $ \dir -> do
-    cpFilter pred (from </> dir) (to </> dir)
+    cpFiltered pred (from </> dir) (to </> dir)
 
 -- | Perform an action on each file in the given directory.
 --   This function will traverse any subdirectories of the given as well.
