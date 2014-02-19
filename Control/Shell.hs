@@ -8,20 +8,22 @@ module Control.Shell (
     shell,
     mayFail, orElse,
     withEnv, getEnv, lookupEnv,
-    run, run_, runInteractive, sudo,
+    run, run_, runInteractive, genericRun, sudo,
     cd, cpDir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,
     withHomeDirectory, inHomeDirectory, withAppDirectory, inAppDirectory,
+    forEachFile, cpFilter,
     isFile, rm, mv, cp, file,
     withTempFile, withTempDirectory, inTempDirectory,
     hPutStr, hPutStrLn, echo,
     module System.FilePath, liftIO
   ) where
 import Control.Applicative
-import Control.Monad (ap)
+import Control.Monad (ap, forM, filterM, forM_, when)
 import Control.Monad.IO.Class
 import Data.Time.Clock
 import Data.Typeable
 import System.FilePath
+import System.IO.Unsafe
 import qualified System.Process as Proc
 import qualified System.Directory as Dir
 import qualified System.Exit as Exit
@@ -171,6 +173,38 @@ run p args stdin = do
     s <- IO.hGetContents out
     return (Right s, [Pid p pid])
 
+-- | Run a program and return a boolean indicating whether the command
+--   succeeded, the output from stdout, and the output from stderr.
+--   This command will never fail.
+genericRun :: FilePath -> [String] -> String -> Shell (Bool, String, String)
+genericRun p args stdin = do
+    (Just inp, Just out, Just err, pid) <- createproc
+    Shell $ \_ -> do
+      let feed str = do
+            case splitAt 4096 str of
+              ([], [])      -> IO.hClose inp
+              (first, str') -> IO.hPutStr inp first >> feed str'
+      Conc.forkIO $ feed stdin
+      o <- IO.hGetContents out
+      e <- IO.hGetContents err
+      merr <- waitPids [Pid p pid]
+      return (Right (maybe True (const False) merr, o, e), [])
+  where
+    createproc = Shell $ \env -> do
+      (inp, out, err, pid) <- Proc.createProcess (cproc env)
+      return (Right (inp, out, err, pid), [])
+    cproc env = Proc.CreateProcess {
+        Proc.cmdspec      = Proc.RawCommand p args,
+        Proc.cwd          = Nothing,
+        Proc.env          = Just env,
+        Proc.std_in       = Proc.CreatePipe,
+        Proc.std_out      = Proc.CreatePipe,
+        Proc.std_err      = Proc.CreatePipe,
+        Proc.close_fds    = False,
+        Proc.create_group = False
+      }
+
+
 -- | Like @run@, but echoes the command's text output to the screen instead of
 --   returning it.
 run_ :: FilePath -> [String] -> String -> Shell ()
@@ -252,6 +286,35 @@ cpDir from to = do
         else do
           liftIO $ Dir.createDirectoryIfMissing False to
           ls from >>= mapM_ (\f -> cpDir (from </> f) (to </> f))
+
+-- | Recursively copy a directory, but omit all files that do not match the
+--   give predicate.
+cpFiltered :: (FilePath -> Bool) -> FilePath -> FilePath -> Shell ()
+cpFiltered pred from to = do
+  isdir <- isDirectory to
+  -- Lazily create directories only when needed!
+  let to' = unsafePerformIO $ do
+        when (not isdir) $ Dir.createDirectory to
+        return to
+  files <- ls from
+  mapM_ ((`cp` to') . (from </>)) (filter pred files)
+  fromdirs <- filterM (\d -> isDirectory (from </> d)) files
+  forM_ fromdirs $ \dir -> do
+    cpFilter pred (from </> dir) (to </> dir)
+
+-- | Perform an action on each file in the given directory.
+--   This function will traverse any subdirectories of the given as well.
+--   File paths are given relative to the given directory; the current working
+--   directory is not affected.
+forEachFile :: FilePath -> (FilePath -> Shell a) -> Shell [a]
+forEachFile dir f = do
+  echo $ "forEachFile in dir " ++ dir
+  files <- map (dir </>) <$> ls dir
+  xs <- filterM isFile files >>= mapM f
+  fromdirs <- filterM isDirectory files
+  xss <- forM fromdirs $ \d -> do
+    forEachFile d f
+  return $ concat (xs:xss)
 
 -- | Copy a file. Fails if the source is a directory. If the target is a
 --   directory, the source file is copied into that directory using its current
