@@ -14,7 +14,8 @@ module Control.Shell (
     withHomeDirectory, inHomeDirectory, withAppDirectory, inAppDirectory,
     forEachFile, cpFiltered,
     isFile, rm, mv, cp, file,
-    withTempFile, withTempDirectory, inTempDirectory,
+    withTempFile, withCustomTempFile,
+    withTempDirectory, withCustomTempDirectory, inTempDirectory,
     hPutStr, hPutStrLn, echo,
     module System.FilePath, liftIO
   ) where
@@ -391,6 +392,14 @@ withTempDirectory template act = Shell $ \env -> do
   where
     act' env fp = Ex.catch (unSh (act fp) env) exHandler
 
+-- | Create a temp directory in given directory, do something with it, then
+--   remove it.
+withCustomTempDirectory :: FilePath -> (FilePath -> Shell a) -> Shell a
+withCustomTempDirectory dir act = Shell $ \env -> do
+    Temp.withTempDirectory dir "shellmate" (act' env)
+  where
+    act' env fp = Ex.catch (unSh (act fp) env) exHandler
+
 -- | Performs a command inside a temporary directory. The directory will be
 --   cleaned up after the command finishes.
 inTempDirectory :: Shell a -> Shell a
@@ -401,6 +410,14 @@ inTempDirectory = withTempDirectory "shellmate" . flip inDirectory
 withTempFile :: String -> (FilePath -> IO.Handle -> Shell a) -> Shell a
 withTempFile template act = Shell $ \env -> do
     Temp.withSystemTempFile template (act' env)
+  where
+    act' env fp h = Ex.catch (unSh (act fp h) env) exHandler
+
+-- | Create a temp file in the standard system temp directory, do something
+--   with it, then remove it.
+withCustomTempFile :: FilePath -> (FilePath -> IO.Handle -> Shell a) -> Shell a
+withCustomTempFile dir act = Shell $ \env -> do
+    Temp.withTempFile dir "shellmate" (act' env)
   where
     act' env fp h = Ex.catch (unSh (act fp h) env) exHandler
 
