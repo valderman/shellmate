@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable,
              MultiParamTypeClasses, FunctionalDependencies,
+             CPP,
              UndecidableInstances #-}
 -- | Simple interface for shell scripting-like tasks.
 module Control.Shell ( 
@@ -201,6 +202,9 @@ genericRun p args stdin = do
         Proc.std_out      = Proc.CreatePipe,
         Proc.std_err      = Proc.CreatePipe,
         Proc.close_fds    = False,
+#if MIN_VERSION_process(1,2,0)
+        Proc.delegate_ctlc = False,
+#endif
         Proc.create_group = False
       }
 
@@ -241,6 +245,9 @@ runP p args stdin stdout = Shell $ \env -> do
         Proc.std_out      = stdout,
         Proc.std_err      = Proc.Inherit,
         Proc.close_fds    = False,
+#if MIN_VERSION_process(1,2,0)
+        Proc.delegate_ctlc = False,
+#endif
         Proc.create_group = False
       }
 
