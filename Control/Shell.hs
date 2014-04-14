@@ -17,6 +17,7 @@ module Control.Shell (
     withTempFile, withCustomTempFile,
     withTempDirectory, withCustomTempDirectory, inTempDirectory,
     hPutStr, hPutStrLn, echo,
+    (|>),
     module System.FilePath, liftIO
   ) where
 import Control.Applicative
