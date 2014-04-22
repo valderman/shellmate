@@ -16,7 +16,7 @@ module Control.Shell (
     isFile, rm, mv, cp, file,
     withTempFile, withCustomTempFile,
     withTempDirectory, withCustomTempDirectory, inTempDirectory,
-    hPutStr, hPutStrLn, echo,
+    hPutStr, hPutStrLn, hClose, echo,
     (|>),
     module System.FilePath, liftIO
   ) where
@@ -448,6 +448,10 @@ hPutStr h s = liftIO $ IO.hPutStr h s
 -- | @IO.hPutStrLn@ lifted into Shell for convenience.
 hPutStrLn :: IO.Handle -> String -> Shell ()
 hPutStrLn h s = liftIO $ IO.hPutStrLn h s
+
+-- | @IO.hClose@ lifted into Shell for convenience.
+hClose :: IO.Handle -> Shell ()
+hClose h = liftIO $ IO.hClose h
 
 -- | @putStrLn@ lifted into Shell for convenience.
 echo :: String -> Shell ()
