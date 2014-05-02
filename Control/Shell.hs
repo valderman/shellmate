@@ -174,7 +174,7 @@ run p args stdin = do
             (first, str') -> IO.hPutStr inp first >> feed str'
     Conc.forkIO $ feed stdin
     s <- IO.hGetContents out
-    return (Right s, [Pid p pid])
+    s `seq` return (Right s, [Pid p pid])
 
 -- | Run a program and return a boolean indicating whether the command
 --   succeeded, the output from stdout, and the output from stderr.
