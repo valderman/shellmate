@@ -6,6 +6,7 @@
 module Control.Shell ( 
     Shell,
     Guard (..),
+    File (..),
     shell,
     mayFail, orElse,
     withEnv, getEnv, lookupEnv,
