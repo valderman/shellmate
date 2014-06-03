@@ -318,7 +318,6 @@ cpFiltered pred from to = do
 --   directory is not affected.
 forEachFile :: FilePath -> (FilePath -> Shell a) -> Shell [a]
 forEachFile dir f = do
-  echo $ "forEachFile in dir " ++ dir
   files <- map (dir </>) <$> ls dir
   xs <- filterM isFile files >>= mapM f
   fromdirs <- filterM isDirectory files
