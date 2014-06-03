@@ -13,8 +13,8 @@ module Control.Shell (
     run, run_, runInteractive, genericRun, sudo,
     cd, cpDir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,
     withHomeDirectory, inHomeDirectory, withAppDirectory, inAppDirectory,
-    forEachFile, cpFiltered,
-    isFile, rm, mv, cp, file,
+    forEachFile, forEachFile_, cpFiltered,
+    isFile, rm, mv, cp,
     withTempFile, withCustomTempFile,
     withTempDirectory, withCustomTempDirectory, inTempDirectory,
     hPutStr, hPutStrLn, hClose, echo,
@@ -324,6 +324,15 @@ forEachFile dir f = do
   xss <- forM fromdirs $ \d -> do
     forEachFile d f
   return $ concat (xs:xss)
+
+-- | Like @forEachFile@ but only performs a side effect.
+forEachFile_ :: FilePath -> (FilePath -> Shell ()) -> Shell ()
+forEachFile_ dir f = do
+  files <- map (dir </>) <$> ls dir
+  filterM isFile files >>= mapM_ f
+  fromdirs <- filterM isDirectory files
+  forM_ fromdirs $ \d -> do
+    forEachFile d f
 
 -- | Copy a file. Fails if the source is a directory. If the target is a
 --   directory, the source file is copied into that directory using its current
