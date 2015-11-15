@@ -80,6 +80,15 @@ shell act = do
       mapM_ (uncurry Env.setEnv) (M.toList (M.filterWithKey (changed old) new))
     changed old k v = maybe True (/= v) (M.lookup k old)
 
+-- | Run a shell computation and discard its return value. If the computation
+--   fails, print its error message to @stderr@ and exit.
+shell' :: Shell a -> IO ()
+shell' act = do
+  res <- shell act
+  case res of
+    Left err -> IO.hPutStrLn stderr err >> Exit.exitFailure
+    _        -> return ()
+
 -- | Lazy counterpart to monadic bind. To stream data from a command 'a' to a
 --   command 'b', do 'a |> b'.
 (|>) :: Shell String -> (String -> Shell a) -> Shell a
