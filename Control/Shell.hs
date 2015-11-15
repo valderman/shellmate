@@ -1,7 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable,
-             MultiParamTypeClasses, FunctionalDependencies,
-             CPP,
-             UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 -- | Simple interface for shell scripting-like tasks.
 module Control.Shell (
 
@@ -233,19 +230,27 @@ hClose = liftIO . IO.hClose
 echo :: MonadIO m => String -> m ()
 echo = liftIO . putStrLn
 
-class Guard guard a | guard -> a where
+class Guard guard where
+  -- | The type of the guard's return value, if it succeeds.
+  type Result guard
+
   -- | Perform a Shell computation; if the computation succeeds but returns
   --   a false-ish value, the outer Shell computation fails with the given
   --   error message.
-  guard :: String -> guard -> Shell a
+  guard :: String -> guard -> Shell (Result guard)
 
-instance Guard (Maybe a) a where
+instance Guard (Maybe a) where
+  type Result (Maybe a) = a
   guard _ (Just x) = return x
-  guard desc _     = fail $ "Guard failed: " ++ desc
+  guard ""  _      = fail $ "Guard failed!"
+  guard desc _     = fail desc
 
-instance Guard Bool () where
+instance Guard Bool where
+  type Result Bool = ()
   guard _ True = return ()
-  guard desc _ = fail $ "Guard failed: " ++ desc
+  guard ""  _  = fail $ "Guard failed!"
+  guard desc _ = fail desc
 
-instance Guard a b => Guard (Shell a) b where
+instance Guard a => Guard (Shell a) where
+  type Result (Shell a) = Result a
   guard desc m = m >>= \x -> guard desc x
