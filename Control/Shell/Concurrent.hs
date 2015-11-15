@@ -49,4 +49,4 @@ check (Future h v) = do
 
 -- | Perform the given computations in parallel.
 parallel :: [Shell a] -> Shell [a]
-parallel ms = mapM (future >=> await) ms
+parallel = mapM future >=> mapM await
