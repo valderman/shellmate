@@ -34,6 +34,8 @@ module Control.Shell (
     withTempDirectory, withCustomTempDirectory, inTempDirectory,
 
     -- * Text I/O
+    IO.Handle,
+    IO.stdin, IO.stdout, IO.stderr,
     hPutStr, hPutStrLn, hClose, echo,
 
     -- * @FilePath@s
@@ -48,11 +50,11 @@ import qualified System.IO as IO
 import Control.Shell.Internal
 
 -- | Lazily read a file.
-readf :: FilePath -> Shell String
+readf :: MonadIO m => FilePath -> m String
 readf = liftIO . readFile
 
 -- | Lazily write a file.
-writef :: FilePath -> String -> Shell ()
+writef :: MonadIO m => FilePath -> String -> m ()
 writef f = liftIO . writeFile f
 
 -- | Set an environment variable.
@@ -85,25 +87,25 @@ sudo :: FilePath -> [String] -> String -> Shell String
 sudo cmd args stdin = run "sudo" (cmd:args) stdin
 
 -- | Change working directory.
-cd :: FilePath -> Shell ()
+cd :: MonadIO m => FilePath -> m ()
 cd = liftIO . Dir.setCurrentDirectory
 
 -- | Get the current working directory.
-pwd :: Shell FilePath
+pwd :: MonadIO m => m FilePath
 pwd = liftIO $ Dir.getCurrentDirectory
 
 -- | Remove a file.
-rm :: FilePath -> Shell ()
+rm :: MonadIO m => FilePath -> m ()
 rm = liftIO . Dir.removeFile
 
 -- | Rename a file.
-mv :: FilePath -> FilePath -> Shell ()
+mv :: MonadIO m => FilePath -> FilePath -> m ()
 mv from to = liftIO $ Dir.renameFile from to
 
 -- | Recursively copy a directory. If the target is a directory that already
 --   exists, the source directory is copied into that directory using its
 --   current name.
-cpDir :: FilePath -> FilePath -> Shell ()
+cpDir :: MonadIO m => FilePath -> FilePath -> m ()
 cpDir from to = do
   todir <- isDirectory to
   if todir
@@ -122,7 +124,7 @@ cpDir from to = do
 --   This function will traverse any subdirectories of the given as well.
 --   File paths are given relative to the given directory; the current working
 --   directory is not affected.
-forEachFile :: FilePath -> (FilePath -> Shell a) -> Shell [a]
+forEachFile :: MonadIO m => FilePath -> (FilePath -> m a) -> m [a]
 forEachFile dir f = do
   files <- map (dir </>) <$> ls dir
   xs <- filterM isFile files >>= mapM f
@@ -132,7 +134,7 @@ forEachFile dir f = do
   return $ concat (xs:xss)
 
 -- | Like @forEachFile@ but only performs a side effect.
-forEachFile_ :: FilePath -> (FilePath -> Shell ()) -> Shell ()
+forEachFile_ :: MonadIO m => FilePath -> (FilePath -> m ()) -> m ()
 forEachFile_ dir f = do
   files <- map (dir </>) <$> ls dir
   filterM isFile files >>= mapM_ f
@@ -143,7 +145,7 @@ forEachFile_ dir f = do
 -- | Copy a file. Fails if the source is a directory. If the target is a
 --   directory, the source file is copied into that directory using its current
 --   name.
-cp :: FilePath -> FilePath -> Shell ()
+cp :: MonadIO m => FilePath -> FilePath -> m ()
 cp from to = do
   todir <- isDirectory to
   if todir
@@ -151,40 +153,41 @@ cp from to = do
     else liftIO $ Dir.copyFile from to
 
 -- | List the contents of a directory, sans '.' and '..'.
-ls :: FilePath -> Shell [FilePath]
+ls :: MonadIO m => FilePath -> m [FilePath]
 ls dir = do
   contents <- liftIO $ Dir.getDirectoryContents dir
   return [f | f <- contents, f /= ".", f /= ".."]
 
 -- | Create a directory. Optionally create any required missing directories as
 --   well.
-mkdir :: Bool -> FilePath -> Shell ()
+mkdir :: MonadIO m => Bool -> FilePath -> m ()
 mkdir True = liftIO . Dir.createDirectoryIfMissing True
 mkdir _    = liftIO . Dir.createDirectory
 
 -- | Recursively remove a directory. Follows symlinks, so be careful.
-rmdir :: FilePath -> Shell ()
+rmdir :: MonadIO m => FilePath -> m ()
 rmdir = liftIO . Dir.removeDirectoryRecursive
 
 -- | Do something with the user's home directory.
-withHomeDirectory :: (FilePath -> Shell a) -> Shell a
+withHomeDirectory :: MonadIO m => (FilePath -> m a) -> m a
 withHomeDirectory act = liftIO Dir.getHomeDirectory >>= act
 
--- | Do something *in* the user's home directory.
-inHomeDirectory :: Shell a -> Shell a
-inHomeDirectory act = withHomeDirectory $ \dir -> inDirectory dir act
+-- | Perform an action with the user's home directory as the working directory.
+inHomeDirectory :: MonadIO m => m a -> m a
+inHomeDirectory act = withHomeDirectory $ flip inDirectory act
 
 -- | Do something with the given application's data directory.
-withAppDirectory :: String -> (FilePath -> Shell a) -> Shell a
+withAppDirectory :: MonadIO m => String -> (FilePath -> m a) -> m a
 withAppDirectory app act = liftIO (Dir.getAppUserDataDirectory app) >>= act
 
--- | Do something *in* the given application's data directory.
-inAppDirectory :: FilePath -> Shell a -> Shell a
-inAppDirectory app act = withAppDirectory app $ \dir -> inDirectory dir act
+-- | Do something with the given application's data directory as the working
+--   directory.
+inAppDirectory :: MonadIO m => FilePath -> m a -> m a
+inAppDirectory app act = withAppDirectory app $ flip inDirectory act
 
 -- | Execute a command in the given working directory, then restore the
 --   previous working directory.
-inDirectory :: FilePath -> Shell a -> Shell a
+inDirectory :: MonadIO m => FilePath -> m a -> m a
 inDirectory dir act = do
   curDir <- pwd
   cd dir
@@ -193,11 +196,11 @@ inDirectory dir act = do
   return x
 
 -- | Does the given path lead to a directory?
-isDirectory :: FilePath -> Shell Bool
+isDirectory :: MonadIO m => FilePath -> m Bool
 isDirectory = liftIO . Dir.doesDirectoryExist
 
 -- | Does the given path lead to a file?
-isFile :: FilePath -> Shell Bool
+isFile :: MonadIO m => FilePath -> m Bool
 isFile = liftIO . Dir.doesFileExist
 
 -- | Performs a command inside a temporary directory. The directory will be
@@ -214,20 +217,20 @@ orElse a b = do
     Right x -> return x
     _       -> b
 
--- | @IO.hPutStr@ lifted into Shell for convenience.
-hPutStr :: IO.Handle -> String -> Shell ()
+-- | Write a string to a handle.
+hPutStr :: MonadIO m => IO.Handle -> String -> m ()
 hPutStr h s = liftIO $ IO.hPutStr h s
 
--- | @IO.hPutStrLn@ lifted into Shell for convenience.
-hPutStrLn :: IO.Handle -> String -> Shell ()
+-- | Write a string to a handle, followed by a newline.
+hPutStrLn :: MonadIO m => IO.Handle -> String -> m ()
 hPutStrLn h s = liftIO $ IO.hPutStrLn h s
 
--- | @IO.hClose@ lifted into Shell for convenience.
-hClose :: IO.Handle -> Shell ()
-hClose h = liftIO $ IO.hClose h
+-- | Close a handle.
+hClose :: MonadIO m => IO.Handle -> m ()
+hClose = liftIO . IO.hClose
 
--- | @putStrLn@ lifted into Shell for convenience.
-echo :: String -> Shell ()
+-- | Write a string to @stdout@ followed by a newline.
+echo :: MonadIO m => String -> m ()
 echo = liftIO . putStrLn
 
 class Guard guard a | guard -> a where
