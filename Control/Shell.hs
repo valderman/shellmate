@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 -- | Simple interface for shell scripting-like tasks.
 module Control.Shell (
-
     -- * Running Shell programs
     Shell, ExitReason (..),
     shell, shell_,
@@ -19,9 +18,9 @@ module Control.Shell (
     run, run_, runInteractive, sudo,
 
     -- * Working with directories
-    cd, cpDir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,
+    cd, cpdir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,
     withHomeDirectory, inHomeDirectory, withAppDirectory, inAppDirectory,
-    forEachFile, forEachFile_,
+    forEachFile, forEachFile_, forEachDirectory, forEachDirectory_,
 
     -- * Working with files
     isFile, rm, mv, cp, input, output,
@@ -108,20 +107,40 @@ mv from to = liftIO $ Dir.renameFile from to
 -- | Recursively copy a directory. If the target is a directory that already
 --   exists, the source directory is copied into that directory using its
 --   current name.
-cpDir :: FilePath -> FilePath -> Shell ()
-cpDir from to = do
-  todir <- isDirectory to
-  if todir
-    then do
-      cpDir from (to </> takeBaseName from)
-    else do
-      cpfile <- isFile from
-      if cpfile
-        then do
-          cp from to
-        else do
-          liftIO $ Dir.createDirectoryIfMissing False to
-          ls from >>= mapM_ (\f -> cpDir (from </> f) (to </> f))
+cpdir :: FilePath -> FilePath -> Shell ()
+cpdir fromdir todir = do
+    dir <- isDirectory todir
+    if dir
+      then go fromdir todir id
+      else go fromdir todir (joinPath . drop 1 . splitPath)
+  where
+    go from to dropFirstDir = do
+      forEachDirectory_ from (\dir -> mkdir True (to </> dropFirstDir dir))
+      forEachFile_ from $ \file -> do
+        let file' = to </> dropFirstDir file
+        assert (errOverwrite file') (not <$> isDirectory file')
+        cp file file'
+    errOverwrite f = "cannot overwrite directory `" ++ f
+                     ++ "' with non-directory"
+
+-- | Recursively perform an action on each subdirectory of the given directory.
+--   The action will *not* be performed on the given directory itself.
+forEachDirectory :: FilePath -> (FilePath -> Shell a) -> Shell [a]
+forEachDirectory dir f = do
+  files <- map (dir </>) <$> ls dir
+  fromdirs <- filterM isDirectory files
+  xs <- forM fromdirs $ \d -> do
+    x <- f d
+    xs <- forEachDirectory d f
+    return (x:xs)
+  return (concat xs)
+
+-- | Like 'forEachDirectory', but discards its result.
+forEachDirectory_ :: FilePath -> (FilePath -> Shell ()) -> Shell ()
+forEachDirectory_ dir f = do
+  files <- map (dir </>) <$> ls dir
+  fromdirs <- filterM isDirectory files
+  forM_ fromdirs $ \d -> f d >> forEachDirectory d f
 
 -- | Perform an action on each file in the given directory.
 --   This function will traverse any subdirectories of the given as well.
