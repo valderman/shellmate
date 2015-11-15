@@ -12,7 +12,7 @@ module Control.Shell (
     Guard (..), guard, when, unless,
 
     -- * Environment handling
-    setEnv, getEnv, withEnv, lookupEnv,
+    setEnv, getEnv, withEnv, lookupEnv, cmdline,
 
     -- * Running commands
     MonadIO (..),
@@ -45,6 +45,7 @@ import System.FilePath
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
 import qualified System.IO as IO
+import System.IO.Unsafe
 import Control.Shell.Internal
 
 -- | Lazily read a file.
@@ -54,6 +55,10 @@ input = liftIO . readFile
 -- | Lazily write a file.
 output :: MonadIO m => FilePath -> String -> m ()
 output f = liftIO . writeFile f
+
+-- | The executable's command line arguments.
+cmdline :: [String]
+cmdline = unsafePerformIO Env.getArgs
 
 -- | Set an environment variable.
 setEnv :: MonadIO m => String -> String -> m ()
@@ -82,7 +87,7 @@ getEnv key = maybe "" id `fmap` lookupEnv key
 
 -- | Run a command with elevated privileges.
 sudo :: FilePath -> [String] -> String -> Shell String
-sudo cmd args stdin = run "sudo" (cmd:args) stdin
+sudo cmd as stdin = run "sudo" (cmd:as) stdin
 
 -- | Change working directory.
 cd :: MonadIO m => FilePath -> m ()
