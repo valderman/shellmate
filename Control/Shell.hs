@@ -7,9 +7,9 @@ module Control.Shell (
     shell, shell_,
 
     -- * Error handling and control flow
-    Guard (..),
     (|>),
     try, orElse, exit,
+    Guard (..), guard, when, unless,
 
     -- * Environment handling
     setEnv, getEnv, withEnv, lookupEnv,
@@ -33,13 +33,13 @@ module Control.Shell (
     -- * Text I/O
     IO.Handle,
     IO.stdin, IO.stdout, IO.stderr,
-    hPutStr, hPutStrLn, hClose, echo,
+    hPutStr, hPutStrLn, hClose, echo, ask,
 
     -- * @FilePath@s
     module System.FilePath
   ) where
 import Control.Applicative
-import Control.Monad (forM, filterM, forM_)
+import Control.Monad (forM, filterM, forM_, void)
 import System.FilePath
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
@@ -47,7 +47,7 @@ import qualified System.IO as IO
 import Control.Shell.Internal
 
 -- | Lazily read a file.
-input :: MonadIO m => FilePath -> m String
+input :: FilePath -> Shell String
 input = liftIO . readFile
 
 -- | Lazily write a file.
@@ -60,13 +60,13 @@ setEnv k v = liftIO $ Env.setEnv k v
 
 -- | Get the value of an environment variable. Returns Nothing if the variable 
 --   doesn't exist.
-lookupEnv :: MonadIO m => String -> m (Maybe String)
+lookupEnv :: String -> Shell (Maybe String)
 lookupEnv = liftIO . Env.lookupEnv
 
 -- | Run a computation with a new value for an environment variable.
 --   Note that this will *not* affect external commands spawned using @liftIO@
 --   or which directory is considered the system temp directory.
-withEnv :: MonadIO m => String -> (String -> String) -> m a -> m a
+withEnv :: String -> (String -> String) -> Shell a -> Shell a
 withEnv key f act = do
   v <- lookupEnv key
   setEnv key $ f (maybe "" id v)
@@ -76,7 +76,7 @@ withEnv key f act = do
 
 -- | Get the value of an environment variable. Returns the empty string if
 --   the variable doesn't exist.
-getEnv :: MonadIO m => String -> m String
+getEnv :: String -> Shell String
 getEnv key = maybe "" id `fmap` lookupEnv key
 
 -- | Run a command with elevated privileges.
@@ -102,7 +102,7 @@ mv from to = liftIO $ Dir.renameFile from to
 -- | Recursively copy a directory. If the target is a directory that already
 --   exists, the source directory is copied into that directory using its
 --   current name.
-cpDir :: MonadIO m => FilePath -> FilePath -> m ()
+cpDir :: FilePath -> FilePath -> Shell ()
 cpDir from to = do
   todir <- isDirectory to
   if todir
@@ -121,7 +121,7 @@ cpDir from to = do
 --   This function will traverse any subdirectories of the given as well.
 --   File paths are given relative to the given directory; the current working
 --   directory is not affected.
-forEachFile :: MonadIO m => FilePath -> (FilePath -> m a) -> m [a]
+forEachFile :: FilePath -> (FilePath -> Shell a) -> Shell [a]
 forEachFile dir f = do
   files <- map (dir </>) <$> ls dir
   xs <- filterM isFile files >>= mapM f
@@ -131,7 +131,7 @@ forEachFile dir f = do
   return $ concat (xs:xss)
 
 -- | Like @forEachFile@ but only performs a side effect.
-forEachFile_ :: MonadIO m => FilePath -> (FilePath -> m ()) -> m ()
+forEachFile_ :: FilePath -> (FilePath -> Shell ()) -> Shell ()
 forEachFile_ dir f = do
   files <- map (dir </>) <$> ls dir
   filterM isFile files >>= mapM_ f
@@ -142,7 +142,7 @@ forEachFile_ dir f = do
 -- | Copy a file. Fails if the source is a directory. If the target is a
 --   directory, the source file is copied into that directory using its current
 --   name.
-cp :: MonadIO m => FilePath -> FilePath -> m ()
+cp :: FilePath -> FilePath -> Shell ()
 cp from to = do
   todir <- isDirectory to
   if todir
@@ -150,7 +150,7 @@ cp from to = do
     else liftIO $ Dir.copyFile from to
 
 -- | List the contents of a directory, sans '.' and '..'.
-ls :: MonadIO m => FilePath -> m [FilePath]
+ls :: FilePath -> Shell [FilePath]
 ls dir = do
   contents <- liftIO $ Dir.getDirectoryContents dir
   return [f | f <- contents, f /= ".", f /= ".."]
@@ -166,25 +166,25 @@ rmdir :: MonadIO m => FilePath -> m ()
 rmdir = liftIO . Dir.removeDirectoryRecursive
 
 -- | Do something with the user's home directory.
-withHomeDirectory :: MonadIO m => (FilePath -> m a) -> m a
+withHomeDirectory :: (FilePath -> Shell a) -> Shell a
 withHomeDirectory act = liftIO Dir.getHomeDirectory >>= act
 
 -- | Perform an action with the user's home directory as the working directory.
-inHomeDirectory :: MonadIO m => m a -> m a
+inHomeDirectory :: Shell a -> Shell a
 inHomeDirectory act = withHomeDirectory $ flip inDirectory act
 
 -- | Do something with the given application's data directory.
-withAppDirectory :: MonadIO m => String -> (FilePath -> m a) -> m a
+withAppDirectory :: String -> (FilePath -> Shell a) -> Shell a
 withAppDirectory app act = liftIO (Dir.getAppUserDataDirectory app) >>= act
 
 -- | Do something with the given application's data directory as the working
 --   directory.
-inAppDirectory :: MonadIO m => FilePath -> m a -> m a
+inAppDirectory :: FilePath -> Shell a -> Shell a
 inAppDirectory app act = withAppDirectory app $ flip inDirectory act
 
 -- | Execute a command in the given working directory, then restore the
 --   previous working directory.
-inDirectory :: MonadIO m => FilePath -> m a -> m a
+inDirectory :: FilePath -> Shell a -> Shell a
 inDirectory dir act = do
   curDir <- pwd
   cd dir
@@ -193,11 +193,11 @@ inDirectory dir act = do
   return x
 
 -- | Does the given path lead to a directory?
-isDirectory :: MonadIO m => FilePath -> m Bool
+isDirectory :: FilePath -> Shell Bool
 isDirectory = liftIO . Dir.doesDirectoryExist
 
 -- | Does the given path lead to a file?
-isFile :: MonadIO m => FilePath -> m Bool
+isFile :: FilePath -> Shell Bool
 isFile = liftIO . Dir.doesFileExist
 
 -- | Performs a command inside a temporary directory. The directory will be
@@ -230,6 +230,10 @@ hClose = liftIO . IO.hClose
 echo :: MonadIO m => String -> m ()
 echo = liftIO . putStrLn
 
+-- | Read one line of input from @stdin@.
+ask :: Shell String
+ask = liftIO getLine
+
 class Guard guard where
   -- | The type of the guard's return value, if it succeeds.
   type Result guard
@@ -237,20 +241,35 @@ class Guard guard where
   -- | Perform a Shell computation; if the computation succeeds but returns
   --   a false-ish value, the outer Shell computation fails with the given
   --   error message.
-  guard :: String -> guard -> Shell (Result guard)
+  assert :: String -> guard -> Shell (Result guard)
 
 instance Guard (Maybe a) where
   type Result (Maybe a) = a
-  guard _ (Just x) = return x
-  guard ""  _      = fail $ "Guard failed!"
-  guard desc _     = fail desc
+  assert _ (Just x) = return x
+  assert ""  _      = fail $ "Guard failed!"
+  assert desc _     = fail desc
 
 instance Guard Bool where
   type Result Bool = ()
-  guard _ True = return ()
-  guard ""  _  = fail $ "Guard failed!"
-  guard desc _ = fail desc
+  assert _ True = return ()
+  assert ""  _  = fail $ "Guard failed!"
+  assert desc _ = fail desc
 
 instance Guard a => Guard (Shell a) where
   type Result (Shell a) = Result a
-  guard desc m = m >>= \x -> guard desc x
+  assert desc m = m >>= \x -> assert desc x
+
+-- | Perform a Shell computation; if the computation succeeds but returns
+--   a false-ish value, the outer Shell computation fails.
+guard :: Guard g => g -> Shell (Result g)
+guard = assert ""
+
+-- | Perform the given computation if the given guard passes, otherwise do
+--   nothing.
+when :: Guard g => g -> Shell a -> Shell ()
+when g m = (guard g >> void m) `orElse` pure ()
+
+-- | Perform the given computation if the given guard fails, otherwise do
+--   nothing.
+unless :: Guard g => g -> Shell a -> Shell ()
+unless g m = void (guard g) `orElse` void m
