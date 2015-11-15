@@ -21,13 +21,18 @@ library
   exposed-modules:
     Control.Shell
     Control.Shell.Concurrent
+    Control.Shell.Download
   other-modules:
     Control.Shell.Internal
   build-depends:
     base >=4.7 && <5,
     containers,
     transformers >=0.3,
-    time,
+    download-curl,
+    feed,
+    tagsoup,
+    xml,
+    bytestring,
     filepath,
     process,
     directory,
