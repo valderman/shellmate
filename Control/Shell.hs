@@ -40,10 +40,8 @@ module Control.Shell (
     module System.FilePath
   ) where
 import Control.Applicative
-import Control.Monad (ap, forM, filterM, forM_, when)
-import Data.Time.Clock
+import Control.Monad (forM, filterM, forM_)
 import System.FilePath
-import System.IO.Unsafe
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
 import qualified System.IO as IO

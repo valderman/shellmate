@@ -82,11 +82,11 @@ shell act = do
 
 -- | Run a shell computation and discard its return value. If the computation
 --   fails, print its error message to @stderr@ and exit.
-shell' :: Shell a -> IO ()
-shell' act = do
+shell_ :: Shell a -> IO ()
+shell_ act = do
   res <- shell act
   case res of
-    Left err -> IO.hPutStrLn stderr err >> Exit.exitFailure
+    Left err -> IO.hPutStrLn IO.stderr err >> Exit.exitFailure
     _        -> return ()
 
 -- | Lazy counterpart to monadic bind. To stream data from a command 'a' to a
