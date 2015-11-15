@@ -1,5 +1,5 @@
 name:                shellmate
-version:             0.1.6
+version:             0.2
 synopsis:            Simple interface for shell scripting in Haskell.
 description:         Aims to simplify development of cross-platform shell scripts and similar things.
 homepage:            http://github.com/valderman/shellmate
@@ -20,12 +20,16 @@ source-repository head
 library
   exposed-modules:
     Control.Shell
-  -- other-modules:       
+  other-modules:
+    Control.Shell.Internal
   build-depends:
-    base >=4.5 && <5,
+    base >=4.7 && <5,
+    containers,
     transformers >=0.3,
     time,
     filepath,
     process,
     directory,
     temporary
+  ghc-options:
+    -Wall
