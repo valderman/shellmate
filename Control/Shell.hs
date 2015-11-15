@@ -35,11 +35,12 @@ module Control.Shell (
     IO.stdin, IO.stdout, IO.stderr,
     hPutStr, hPutStrLn, hClose, echo, ask,
 
-    -- * @FilePath@s
-    module System.FilePath
+    -- * Convenient re-exports
+    module System.FilePath,
+    module Control.Monad
   ) where
 import Control.Applicative
-import Control.Monad (forM, filterM, forM_, void)
+import Control.Monad hiding (guard, when, unless)
 import System.FilePath
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
