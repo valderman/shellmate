@@ -27,7 +27,7 @@ module Control.Shell (
     forEachFile, forEachFile_,
 
     -- * Working with files
-    isFile, rm, mv, cp, readf, writef,
+    isFile, rm, mv, cp, input, output,
 
     -- * Working with temporary files and directories
     withTempFile, withCustomTempFile,
@@ -50,12 +50,12 @@ import qualified System.IO as IO
 import Control.Shell.Internal
 
 -- | Lazily read a file.
-readf :: MonadIO m => FilePath -> m String
-readf = liftIO . readFile
+input :: MonadIO m => FilePath -> m String
+input = liftIO . readFile
 
 -- | Lazily write a file.
-writef :: MonadIO m => FilePath -> String -> m ()
-writef f = liftIO . writeFile f
+output :: MonadIO m => FilePath -> String -> m ()
+output f = liftIO . writeFile f
 
 -- | Set an environment variable.
 setEnv :: MonadIO m => String -> String -> m ()
