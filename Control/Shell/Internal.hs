@@ -1,14 +1,15 @@
 {-# LANGUAGE CPP #-}
+-- | Internal, hairy bits of Shellmate.
 module Control.Shell.Internal (
-    MonadIO (..), Shell,
+    MonadIO (..), Shell, ExitReason (..),
     shell, shell_,
-    (|>),
+    (|>), exit,
     run, run_, runInteractive,
     withTempDirectory, withCustomTempDirectory,
     withTempFile, withCustomTempFile,
     try
   ) where
-import Control.Monad (ap, forM, filterM, forM_, when)
+import Control.Monad (ap)
 import Control.Monad.IO.Class
 import Data.Typeable
 import qualified Control.Concurrent as Conc
@@ -30,12 +31,22 @@ data Pid = Pid {pidName :: String, pidHandle :: Proc.ProcessHandle}
 -- | Monad for running shell commands. If a command fails, the entire
 --   computation is aborted unless @mayFail@ is used.
 newtype Shell a = Shell {
-    unSh :: IO ([Pid], Either String a)
+    unSh :: IO ([Pid], Result a)
   }
 
+data Result a = Fail !String | Next !a | Done
+
+data ExitReason = Success | Failure !String
+  deriving (Show, Eq)
+
+instance Functor Result where
+  fmap f (Next x) = Next (f x)
+  fmap _ (Fail x) = Fail x
+  fmap _ Done     = Done
+
 instance Monad Shell where
-  fail err = Shell $ return ([], Left err)
-  return x = Shell $ return ([], Right x)
+  fail err = Shell $ return ([], Fail err)
+  return x = Shell $ return ([], Next x)
   -- | The bind operation of the Shell monad is effectively a barrier; all
   --   commands on the left hand side of a bind will complete before any
   --   command on the right hand side is attempted.
@@ -44,14 +55,15 @@ instance Monad Shell where
     (pids, x) <- m
     merr <- waitPids pids
     case (x, merr) of
-      (Left err, _) -> return ([], Left err)
-      (_, Just err) -> return ([], Left err)
-      (Right x', _) -> unSh (f x')
+      (Fail err, _) -> return ([], Fail err)
+      (_, Just err) -> return ([], Fail err)
+      (Next x', _)  -> unSh (f x')
+      (Done, _)     -> return ([], Done)
 
 instance MonadIO Shell where
   liftIO act = Shell $ flip Ex.catch exHandler $ do
     x <- act
-    return ([], Right x)
+    return ([], Next x)
 
 instance Applicative Shell where
   pure  = return
@@ -62,7 +74,7 @@ instance Functor Shell where
 
 -- | Run a Shell computation. The program's working directory and environment
 --   will be restored after after the computation finishes.
-shell :: Shell a -> IO (Either String a)
+shell :: Shell a -> IO (Either ExitReason a)
 shell act = do
     dir <- Dir.getCurrentDirectory
     env <- M.fromList <$> Env.getEnvironment
@@ -71,9 +83,13 @@ shell act = do
     Dir.setCurrentDirectory dir
     resetEnv env
     case merr of
-      Just err -> return $ Left err
-      _        -> return res
+      Just err -> return $ Left $ Failure err
+      _        -> return $ resultToEither res
   where
+    resultToEither (Next x) = Right x
+    resultToEither (Fail e) = Left (Failure e)
+    resultToEither (Done)   = Left Success
+    
     resetEnv old = do
       new <- M.fromList <$> Env.getEnvironment
       mapM_ (Env.unsetEnv . fst) (M.toList (new M.\\ old))
@@ -86,8 +102,8 @@ shell_ :: Shell a -> IO ()
 shell_ act = do
   res <- shell act
   case res of
-    Left err -> IO.hPutStrLn IO.stderr err >> Exit.exitFailure
-    _        -> return ()
+    Left (Failure err) -> IO.hPutStrLn IO.stderr err >> Exit.exitFailure
+    _                  -> return ()
 
 -- | Lazy counterpart to monadic bind. To stream data from a command 'a' to a
 --   command 'b', do 'a |> b'.
@@ -95,10 +111,15 @@ shell_ act = do
 (Shell m) |> f = Shell $ do
   (pids, x) <- m
   (pids', x') <- case x of
-    Left err -> return ([], Left err)
-    Right x' -> unSh (f x')
+    Fail err -> return ([], Fail err)
+    Next x'  -> unSh (f x')
+    Done     -> return ([], Done)
   return (pids ++ pids', x')
 infixl 1 |>
+
+-- | Terminate a computation, successfully.
+exit :: Shell a
+exit = Shell $ return ([], Done)
 
 -- | Create a temp directory in the standard system temp directory, do
 --   something with it, then remove it.
@@ -133,14 +154,17 @@ withCustomTempFile dir act = Shell $ do
     act' fp h = Ex.catch (unSh (act fp h)) exHandler
 
 -- | Perform an action that may fail without aborting the entire computation.
---   Forces serialization.
+--   Forces serialization. If the inner computation terminates successfully,
+--   the outer computation terminates as well.
 try :: Shell a -> Shell (Either String a)
 try (Shell act) = Shell $ do
   (pids, x) <- Ex.catch act exHandler
   merr <- waitPids pids
-  case merr of
-    Just err -> return ([], Right (Left err))
-    _        -> return ([], Right x)
+  case (merr, x) of
+    (Just err, _) -> return ([], Next (Left err))
+    (_, Next x')  -> return ([], Next (Right x'))
+    (_, Fail err) -> return ([], Next (Left err))
+    (_, Done)     -> return ([], Done)
 
 -- | Wait for all processes in the given list. If a process has failed, its
 --   error message is returned and the rest are killed.
@@ -162,8 +186,8 @@ killPids :: [Pid] -> IO ()
 killPids = mapM_ (Proc.terminateProcess . pidHandle)
 
 -- | General exception handler; any exception causes failure.
-exHandler :: Ex.SomeException -> IO ([Pid], Either String a)
-exHandler x = return ([], Left $ show x)
+exHandler :: Ex.SomeException -> IO ([Pid], Result a)
+exHandler x = return ([], Fail $ show x)
 
 -- | Like 'run', but echoes the command's text output to the screen instead of
 --   returning it.
@@ -200,10 +224,10 @@ run p args stdin = do
           case splitAt 4096 str of
             ([], [])      -> IO.hClose inp
             (first, str') -> IO.hPutStr inp first >> feed str'
-    Conc.forkIO $ feed stdin
+    _ <- Conc.forkIO $ feed stdin
     output <- IO.hGetContents out
     return (output, pid)
-  output `seq` Shell $ return ([Pid p pid], Right output)
+  output `seq` Shell $ return ([Pid p pid], Next output)
 
 -- | Create a process. Helper for 'run' and friends.
 runP :: String

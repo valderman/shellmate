@@ -4,15 +4,15 @@
              UndecidableInstances #-}
 -- | Simple interface for shell scripting-like tasks.
 module Control.Shell (
-    -- * Basic types and classes
-    Shell,
 
     -- * Running Shell programs
-    shell, (|>),
+    Shell, ExitReason (..),
+    shell, shell_,
 
-    -- * Error handling
+    -- * Error handling and control flow
     Guard (..),
-    try, orElse,
+    (|>),
+    try, orElse, exit,
 
     -- * Environment handling
     setEnv, getEnv, withEnv, lookupEnv,
