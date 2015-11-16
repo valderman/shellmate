@@ -31,8 +31,8 @@ fetchBS = liftE . C.openURI
 fetch :: URI -> Shell String
 fetch = liftE . C.openURIString
 
--- | Download content specified by a url using curl, returning the content
---   as a strict 'ByteString'.
+-- | Download content specified by a url using curl, writing the content to
+--   the file specified by the given 'FilePath'.
 fetchFile :: FilePath -> URI -> Shell ()
 fetchFile file = fetchBS >=> liftIO . BS.writeFile file
 
