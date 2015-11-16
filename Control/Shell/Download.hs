@@ -1,7 +1,7 @@
 -- | Shellmate wrapper for @download-curl@.
 module Control.Shell.Download (
     URI,
-    fetch, fetchBS,
+    fetch, fetchBytes,
     fetchFile,
     fetchTags, fetchXML, fetchFeed
   ) where
@@ -24,8 +24,8 @@ liftE m = do
 
 -- | Download content specified by a url using curl, returning the content
 --   as a strict 'ByteString'.
-fetchBS :: URI -> Shell ByteString
-fetchBS = liftE . C.openURI
+fetchBytes :: URI -> Shell ByteString
+fetchBytes = liftE . C.openURI
 
 -- | Download content specified by a url using curl, returning the content
 --   as a 'String'.
@@ -35,7 +35,7 @@ fetch = liftE . C.openURIString
 -- | Download content specified by a url using curl, writing the content to
 --   the file specified by the given 'FilePath'.
 fetchFile :: FilePath -> URI -> Shell ()
-fetchFile file = fetchBS >=> liftIO . BS.writeFile file
+fetchFile file = fetchBytes >=> liftIO . BS.writeFile file
 
 -- | Download the content as for 'fetch', but return it as a list of parsed
 --   tags using the tagsoup html parser.
