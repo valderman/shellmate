@@ -1,14 +1,18 @@
 -- | Shellmate wrapper for @download-curl@.
 module Control.Shell.Download (
+    URI,
     fetch, fetchBS,
+    fetchFile,
     fetchTags, fetchXML, fetchFeed
   ) where
+import Data.ByteString as BS (ByteString, writeFile)
 import Network.Curl.Download as C
-import Data.ByteString (ByteString)
-import Control.Shell
 import Text.HTML.TagSoup (Tag)
 import Text.XML.Light.Types (Content)
 import Text.Feed.Types (Feed)
+import Control.Shell
+
+type URI = String
 
 liftE :: IO (Either String a) -> Shell a
 liftE m = do
@@ -19,25 +23,30 @@ liftE m = do
 
 -- | Download content specified by a url using curl, returning the content
 --   as a strict 'ByteString'.
-fetchBS :: String -> Shell ByteString
+fetchBS :: URI -> Shell ByteString
 fetchBS = liftE . C.openURI
 
 -- | Download content specified by a url using curl, returning the content
 --   as a 'String'.
-fetch :: String -> Shell String
+fetch :: URI -> Shell String
 fetch = liftE . C.openURIString
+
+-- | Download content specified by a url using curl, returning the content
+--   as a strict 'ByteString'.
+fetchFile :: FilePath -> URI -> Shell ()
+fetchFile file = fetchBS >=> liftIO . BS.writeFile file
 
 -- | Download the content as for 'fetch', but return it as a list of parsed
 --   tags using the tagsoup html parser.
-fetchTags :: String -> Shell [Tag String]
+fetchTags :: URI -> Shell [Tag String]
 fetchTags = liftE . C.openAsTags
 
 -- | Download the content as for 'fetch', but return it as parsed XML, using
 --   the xml-light parser.
-fetchXML :: String -> Shell [Content]
+fetchXML :: URI -> Shell [Content]
 fetchXML = liftE . C.openAsXML
 
 -- | Download the content as for 'fetch', but return it as as parsed RSS or
 --   Atom content, using the feed library parser.
-fetchFeed :: String -> Shell Feed
+fetchFeed :: URI -> Shell Feed
 fetchFeed = liftE . C.openAsFeed
