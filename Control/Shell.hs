@@ -15,7 +15,7 @@ module Control.Shell (
 
     -- * Running commands
     MonadIO (..),
-    run, run_, runWithStderr, runInteractive, sudo,
+    run, run_, genericRun, runInteractive, sudo,
 
     -- * Working with directories
     cd, cpdir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory,

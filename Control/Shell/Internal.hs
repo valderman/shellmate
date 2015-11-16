@@ -4,7 +4,7 @@ module Control.Shell.Internal (
     MonadIO (..), Shell, ExitReason (..),
     shell, shell_,
     (|>), exit,
-    run, run_, runWithStderr, runInteractive,
+    run, run_, genericRun, runInteractive,
     withTempDirectory, withCustomTempDirectory,
     withTempFile, withCustomTempFile,
     try
@@ -212,42 +212,46 @@ runInteractive p args = do
     (_, _, _, pid) <- runP p args Proc.Inherit Proc.Inherit Proc.Inherit
     Proc.waitForProcess pid
   case exCode of
-    Exit.ExitFailure ec -> fail (show ec)
+    Exit.ExitFailure ec -> fail $ "Command '" ++ p ++ "' failed with error " 
+                                ++" code " ++ show ec
     _                   -> return ()
 
 -- | Execute an external command. No globbing, escaping or other external shell
 --   magic is performed on either the command or arguments. The program's
 --   stdout will be returned, and not echoed to the screen.
 run :: FilePath -> [String] -> String -> Shell String
-run p args stdin = fst <$> genericRun p args stdin Proc.Inherit
+run p args stdin = Shell $ do
+  (output, _, pid) <- runHelper p args stdin Proc.Inherit
+  return ([Pid p pid], Next output)
 
--- | Like 'run', but returns the program's standard error stream as well.
-runWithStderr :: FilePath -> [String] -> String -> Shell (String, String)
-runWithStderr p args stdin = do
-  (output, Just errh) <- genericRun p args stdin Proc.CreatePipe
+-- | Like 'run', but always succeeds and returns the program's standard
+--   error stream and exit code.
+genericRun :: FilePath -> [String] -> String -> Shell (Int, String, String)
+genericRun p args stdin = Shell $ do
+  (output, Just errh, pid) <- runHelper p args stdin Proc.CreatePipe
+  exCode <- Proc.waitForProcess pid
   errstr <- liftIO $ IO.hGetContents errh
-  errstr `seq` return (output, errstr)
+  case errstr `seq` exCode of
+    Exit.ExitSuccess    -> return ([], Next (0, output, errstr))
+    Exit.ExitFailure ec -> return ([], Next (ec, output, errstr))
 
 -- | Helper for 'run' and 'runWithStderr'.
-genericRun :: FilePath
+runHelper :: FilePath
            -> [String]
            -> String
            -> Proc.StdStream
-           -> Shell (String, Maybe IO.Handle)
-genericRun p args inpstr errstream = do
-  (output, merr, pid) <- liftIO $ do
-    (Just inp, Just out, merr, pid) <- runP p args Proc.CreatePipe
-                                                   Proc.CreatePipe
-                                                   errstream
-    let feed str = do
-          case splitAt 4096 str of
-            ([], [])      -> IO.hClose inp
-            (first, str') -> IO.hPutStr inp first >> feed str'
-    _ <- Conc.forkIO $ feed inpstr
-    output <- IO.hGetContents out
-    return (output, merr, pid)
-  output `seq` Shell $ return ([Pid p pid], Next (output, merr))
-
+           -> IO (String, Maybe IO.Handle, Proc.ProcessHandle)
+runHelper p args inpstr errstream = do
+  (Just inp, Just out, merr, pid) <- runP p args Proc.CreatePipe
+                                                 Proc.CreatePipe
+                                                 errstream
+  let feed str = do
+        case splitAt 4096 str of
+          ([], [])      -> IO.hClose inp
+          (first, str') -> IO.hPutStr inp first >> feed str'
+  _ <- Conc.forkIO $ feed inpstr
+  output <- IO.hGetContents out
+  output `seq` return (output, merr, pid)
 
 -- | Create a process. Helper for 'run' and friends.
 runP :: String
