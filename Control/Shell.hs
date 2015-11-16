@@ -3,7 +3,7 @@
 module Control.Shell (
     -- * Running Shell programs
     Shell, ExitReason (..),
-    shell, shell_,
+    shell, shell_, exitString,
 
     -- * Error handling and control flow
     (|>),
@@ -53,6 +53,16 @@ import qualified System.Environment as Env
 import System.IO.Unsafe
 import Control.Shell.Handle
 import Control.Shell.Internal
+
+-- | Convert an 'ExitReason' into a 'String'. Successful termination yields
+--   the empty string, while abnormal termination yields the termination
+--   error message. If the program terminaged abnormally but without an error
+--   message - i.e. the error message is empty string - the error message will
+--   be shown as @"abnormal termination"@.
+exitString :: ExitReason -> String
+exitString Success      = ""
+exitString (Failure "") = "abnormal termination"
+exitString (Failure s)  = s
 
 -- | Lazily read a file.
 input :: FilePath -> Shell String
