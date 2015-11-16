@@ -10,7 +10,7 @@ import Control.Monad
 import Control.Shell
 import Data.IORef
 
-type FinalizerHandle = IORef Int
+type FinalizerHandle = IORef ThreadId
 
 -- | A future is a computation which is run in parallel with a program's main
 --   thread and which may at some later point finish and return a value.
@@ -26,7 +26,10 @@ future :: Shell a -> Shell (Future a)
 future m = liftIO $ do
   v <- newEmptyMVar
   tid <- forkIO $ shell m >>= putMVar v
-  r <- newIORef 0
+  -- For some reason, saving the TID in the future and reading it back after
+  -- the future has been successfully awaited keeps GHC from optimizing away
+  -- the IORef too early.
+  r <- newIORef tid
   _ <- mkWeakIORef r (killThread tid)
   return $ Future r v
 
@@ -41,12 +44,12 @@ fromResult x =
 
 -- | Wait for a future value.
 await :: Future a -> Shell a
-await (Future h v) = liftIO (readMVar v) >>= (h `seq` fromResult)
+await (Future h v) = liftIO (readMVar v <* readIORef h) >>= fromResult
 
 -- | Check whether a future value has arrived or not.
 check :: Future a -> Shell (Maybe a)
 check (Future h v) = do
-  mx <- liftIO $ tryReadMVar v
+  mx <- liftIO $ tryReadMVar v <* readIORef h
   maybe (pure Nothing) (fmap Just . fromResult) (h `seq` mx)
 
 -- | Perform the given computations in parallel.
