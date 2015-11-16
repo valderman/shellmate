@@ -2,7 +2,8 @@
 module Control.Shell.Concurrent (
     Future,
     future, await, check,
-    parallel, parallel_
+    parallel, parallel_,
+    chunks
   ) where
 import Control.Concurrent
 import Control.Monad
@@ -55,3 +56,12 @@ parallel = mapM future >=> mapM await
 -- | Like 'parallel', but discards any return values.
 parallel_ :: [Shell a] -> Shell ()
 parallel_ = mapM future >=> mapM_ await
+
+-- | Break a list into chunks. This is quite useful for when performing *every*
+--   computation in parallel is too much. For instance, to download a list of
+--   files three at a time, one would do
+--   @mapM_ (parallel_ downloadFile) (chunks 3 files)@.
+chunks :: Int -> [a] -> [[a]]
+chunks _ []                 = []
+chunks n xs | length xs > n = take n xs : chunks n (drop n xs)
+            | otherwise     = [xs]
