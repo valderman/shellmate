@@ -1,6 +1,6 @@
 -- | Writing Shell programs using 'Handle's.
 module Control.Shell.Handle (
-    IO.Handle, IO.IOMode,
+    IO.Handle, IO.IOMode (..),
     IO.stdin, IO.stdout, IO.stderr,
 
     hPutStr, hPutStrLn,

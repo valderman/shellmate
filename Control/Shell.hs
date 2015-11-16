@@ -30,7 +30,7 @@ module Control.Shell (
     withTempDirectory, withCustomTempDirectory, inTempDirectory,
 
     -- * Working with handles
-    Handle, IOMode,
+    Handle, IOMode (..),
     stdin, stdout, stderr,
     hClose, withFile, withBinaryFile, openFile, openBinaryFile,
 
