@@ -297,7 +297,11 @@ guard = assert ""
 -- | Perform the given computation if the given guard passes, otherwise do
 --   nothing.
 when :: Guard g => g -> Shell a -> Shell ()
-when g m = (guard g >> void m) `orElse` pure ()
+when g m = do
+  res <- try (guard g)
+  case res of
+    Right _ -> void m
+    _       -> pure ()
 
 -- | Perform the given computation if the given guard fails, otherwise do
 --   nothing.
