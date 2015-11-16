@@ -23,6 +23,7 @@ library
     Control.Shell.Concurrent
     Control.Shell.Download
   other-modules:
+    Control.Shell.Handle
     Control.Shell.Internal
   build-depends:
     base >=4.7 && <5,

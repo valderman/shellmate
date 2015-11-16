@@ -12,6 +12,7 @@ import Text.XML.Light.Types (Content)
 import Text.Feed.Types (Feed)
 import Control.Shell
 
+-- | A Uniform Resource Locator.
 type URI = String
 
 liftE :: IO (Either String a) -> Shell a

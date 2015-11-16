@@ -29,10 +29,17 @@ module Control.Shell (
     withTempFile, withCustomTempFile,
     withTempDirectory, withCustomTempDirectory, inTempDirectory,
 
+    -- * Working with handles
+    Handle, IOMode,
+    stdin, stdout, stderr,
+    hClose, withFile, withBinaryFile, openFile, openBinaryFile,
+
     -- * Text I/O
-    IO.Handle,
-    IO.stdin, IO.stdout, IO.stderr,
-    hPutStr, hPutStrLn, hClose, echo, ask,
+    hPutStr, hPutStrLn, echo, ask,
+    hGetLine, hGetContents,
+
+    -- * ByteString I/O
+    hGetBytes, hPutBytes, hGetByteLine, hGetByteContents,
 
     -- * Convenient re-exports
     module System.FilePath,
@@ -43,8 +50,8 @@ import Control.Monad hiding (guard, when, unless)
 import System.FilePath
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
-import qualified System.IO as IO
 import System.IO.Unsafe
+import Control.Shell.Handle
 import Control.Shell.Internal
 
 -- | Lazily read a file.
@@ -86,7 +93,7 @@ getEnv key = maybe "" id `fmap` lookupEnv key
 
 -- | Run a command with elevated privileges.
 sudo :: FilePath -> [String] -> String -> Shell String
-sudo cmd as stdin = run "sudo" (cmd:as) stdin
+sudo cmd as = run "sudo" (cmd:as)
 
 -- | Change working directory.
 cd :: MonadIO m => FilePath -> m ()
@@ -238,18 +245,6 @@ orElse a b = do
   case ex of
     Right x -> return x
     _       -> b
-
--- | Write a string to a handle.
-hPutStr :: MonadIO m => IO.Handle -> String -> m ()
-hPutStr h s = liftIO $ IO.hPutStr h s
-
--- | Write a string to a handle, followed by a newline.
-hPutStrLn :: MonadIO m => IO.Handle -> String -> m ()
-hPutStrLn h s = liftIO $ IO.hPutStrLn h s
-
--- | Close a handle.
-hClose :: MonadIO m => IO.Handle -> m ()
-hClose = liftIO . IO.hClose
 
 -- | Write a string to @stdout@ followed by a newline.
 echo :: MonadIO m => String -> m ()
