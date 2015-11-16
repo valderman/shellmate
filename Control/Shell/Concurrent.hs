@@ -1,7 +1,8 @@
 -- | Concurrency for Shellmate programs.
 module Control.Shell.Concurrent (
     Future,
-    future, await, check, parallel
+    future, await, check,
+    parallel, parallel_
   ) where
 import Control.Concurrent
 import Control.Monad
@@ -50,3 +51,7 @@ check (Future h v) = do
 -- | Perform the given computations in parallel.
 parallel :: [Shell a] -> Shell [a]
 parallel = mapM future >=> mapM await
+
+-- | Like 'parallel', but discards any return values.
+parallel_ :: [Shell a] -> Shell ()
+parallel_ = mapM future >=> mapM_ await
