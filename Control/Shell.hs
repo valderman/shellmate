@@ -32,7 +32,7 @@ module Control.Shell (
     -- * Working with handles
     Handle, IOMode (..),
     stdin, stdout, stderr,
-    hClose, withFile, withBinaryFile, openFile, openBinaryFile,
+    hFlush, hClose, withFile, withBinaryFile, openFile, openBinaryFile,
 
     -- * Text I/O
     hPutStr, hPutStrLn, echo, ask,

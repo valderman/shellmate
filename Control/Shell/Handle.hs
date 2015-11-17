@@ -8,7 +8,7 @@ module Control.Shell.Handle (
 
     hGetBytes, hPutBytes, hGetByteLine, hGetByteContents,
 
-    hClose, withFile, withBinaryFile, openFile, openBinaryFile
+    hFlush, hClose, withFile, withBinaryFile, openFile, openBinaryFile
   ) where
 import qualified System.IO as IO
 import qualified Data.ByteString as BS
@@ -25,6 +25,10 @@ hPutStrLn h s = liftIO $ IO.hPutStrLn h s
 -- | Close a handle.
 hClose :: IO.Handle -> Shell ()
 hClose = liftIO . IO.hClose
+
+-- | Flush a handle.
+hFlush :: IO.Handle -> Shell ()
+hFlush = liftIO . IO.hFlush
 
 -- | Read a line of input from a handle.
 hGetLine :: IO.Handle -> Shell String
