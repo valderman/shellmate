@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, CPP #-}
 -- | Simple interface for shell scripting-like tasks.
 module Control.Shell (
     -- * Running Shell programs
@@ -45,7 +45,9 @@ module Control.Shell (
     module System.FilePath,
     module Control.Monad
   ) where
+#if __GLASGOW_HASKELL__ <= 708
 import Control.Applicative
+#endif
 import Control.Monad hiding (guard, when, unless)
 import System.FilePath
 import qualified System.Directory as Dir

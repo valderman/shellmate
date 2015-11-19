@@ -9,9 +9,11 @@ module Control.Shell.Internal (
     withTempFile, withCustomTempFile,
     try
   ) where
+#if __GLASGOW_HASKELL__ <= 708
+import Control.Applicative
+#endif
 import Control.Monad (ap)
 import Control.Monad.IO.Class
-import Data.Typeable
 import qualified Control.Concurrent as Conc
 import qualified Control.Exception as Ex
 import qualified Data.Map as M
@@ -21,9 +23,6 @@ import qualified System.Exit as Exit
 import qualified System.Process as Proc
 import qualified System.IO as IO
 import qualified System.IO.Temp as Temp
-
-newtype ShellException = ShellException String deriving (Typeable, Show)
-instance Ex.Exception ShellException
 
 -- | A command name plus a ProcessHandle.
 data Pid = Pid {pidName :: String, pidHandle :: Proc.ProcessHandle}
