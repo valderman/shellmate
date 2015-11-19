@@ -95,7 +95,7 @@ withEnv key f act = do
   v <- lookupEnv key
   setEnv key $ f (maybe "" id v)
   x <- act
-  maybe (return ()) (setEnv key) v
+  setEnv key $ maybe "" id v
   return x
 
 -- | Get the value of an environment variable. Returns the empty string if
