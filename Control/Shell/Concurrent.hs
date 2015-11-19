@@ -26,9 +26,9 @@ future :: Shell a -> Shell (Future a)
 future m = liftIO $ do
   v <- newEmptyMVar
   tid <- forkIO $ shell m >>= putMVar v
-  -- For some reason, saving the TID in the future and reading it back after
-  -- the future has been successfully awaited keeps GHC from optimizing away
-  -- the IORef too early.
+  -- We need a WeakRef to something that's not referenced by the computation
+  -- to be able to kill it when the result is not reachable. IORef to TID is
+  -- as good as anything.
   r <- newIORef tid
   _ <- mkWeakIORef r (killThread tid)
   return $ Future r v
