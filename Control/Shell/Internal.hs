@@ -16,7 +16,7 @@ import Control.Monad (ap)
 import Control.Monad.IO.Class
 import qualified Control.Concurrent as Conc
 import qualified Control.Exception as Ex
-import qualified Data.Map as M
+import Data.List (sort)
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
 import qualified System.Exit as Exit
@@ -71,12 +71,35 @@ instance Applicative Shell where
 instance Functor Shell where
   fmap f (Shell x) = Shell (fmap (fmap (fmap f)) x)
 
+-- | Given a list of old key-value pairs and a list of new key-value pairs,
+--   returns the list of key-value pairs where the key exists in both the old
+--   and the new list, and the values are different between the new and the old
+--   list. The values in the returned list are taken from the old list.
+--   Keys must be unique.
+--   @oldValues [(a, 1), (c, 2)] [(b, 3), (c, 4)] == [(c, 2)]@
+oldValues :: (Ord a, Eq a, Eq b) => [(a, b)] -> [(a, b)] -> [(a, b)]
+oldValues xxs@((k1, v1):xs) yys@((k2, v2):ys)
+  | k1 <  k2             = oldValues xs yys
+  | k1 >  k2             = oldValues xxs ys
+  | k1 == k2 && v1 /= v2 = (k1, v1) : oldValues xs ys
+  | otherwise            = oldValues xs ys
+oldValues _ _            = []
+
+-- | Remove all given keys from the given key-value list. Both lists must be
+--   sorted, and the keys in the key-value list must be unique.
+(\\) :: (Ord a, Eq a) => [(a, b)] -> [(a, b)] -> [(a, b)]
+xxs@(x@(k1,_):xs) \\ kks@((k,_):ks)
+  | k <  k1 = xxs \\ ks
+  | k >  k1 = x:(xs \\ kks)
+  | k == k1 = xs \\ ks
+xs \\ _     = xs
+
 -- | Run a Shell computation. The program's working directory and environment
 --   will be restored after after the computation finishes.
 shell :: Shell a -> IO (Either ExitReason a)
 shell act = do
     dir <- Dir.getCurrentDirectory
-    env <- M.fromList <$> Env.getEnvironment
+    env <- sort <$> Env.getEnvironment
     (pids, res) <- unSh act
     merr <- waitPids pids
     Dir.setCurrentDirectory dir
@@ -88,12 +111,12 @@ shell act = do
     resultToEither (Next x) = Right x
     resultToEither (Fail e) = Left (Failure e)
     resultToEither (Done)   = Left Success
-    
+
+    resetEnv :: [(String, String)] -> IO ()
     resetEnv old = do
-      new <- M.fromList <$> Env.getEnvironment
-      mapM_ (Env.unsetEnv . fst) (M.toList (new M.\\ old))
-      mapM_ (uncurry Env.setEnv) (M.toList (M.filterWithKey (changed old) new))
-    changed old k v = maybe True (/= v) (M.lookup k old)
+      new <- sort <$> Env.getEnvironment
+      mapM_ (Env.unsetEnv . fst) (new \\ old)
+      mapM_ (uncurry Env.setEnv) (oldValues old new)
 
 -- | Run a shell computation and discard its return value. If the computation
 --   fails, print its error message to @stderr@ and exit.

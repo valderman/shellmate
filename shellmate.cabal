@@ -27,7 +27,6 @@ library
     Control.Shell.Internal
   build-depends:
     base >=4.7 && <5,
-    containers,
     transformers >=0.3,
     download-curl,
     feed,
