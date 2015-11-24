@@ -128,15 +128,19 @@ mv from to = liftIO $ Dir.renameFile from to
 --   current name.
 cpdir :: FilePath -> FilePath -> Shell ()
 cpdir fromdir todir = do
-    when (not <$> isDirectory todir) $ mkdir True todir
-    go fromdir todir
+    exists <- isDirectory todir
+    if exists
+      then do
+        mkdir True (todir </> takeFileName fromdir)
+        go fromdir (todir </> takeFileName fromdir)
+      else mkdir True todir >> go fromdir todir
   where
     go from to = do
-      forEachDirectory_ from (\dir -> echo (to </> dir) >> mkdir True (to </> dir))
+      forEachDirectory_ from (\dir -> mkdir True (to </> dir))
       forEachFile_ from $ \file -> do
         let file' = to </> file
         assert (errOverwrite file') (not <$> isDirectory file')
-        cp file file'
+        cp (from </> file) file'
     errOverwrite f = "cannot overwrite directory `" ++ f
                      ++ "' with non-directory"
 
