@@ -173,22 +173,34 @@ forEachDirectory_ root f = go ""
 --   File paths are given relative to the given directory; the current working
 --   directory is not affected.
 forEachFile :: FilePath -> (FilePath -> Shell a) -> Shell [a]
-forEachFile dir f = do
-  files <- map (dir </>) <$> ls dir
-  xs <- filterM isFile files >>= mapM f
-  fromdirs <- filterM isDirectory files
-  xss <- forM fromdirs $ \d -> do
-    forEachFile d f
-  return $ concat (xs:xss)
+forEachFile root f = go ""
+  where
+    dir = if null root then "." else root
+    go subdir = do
+      let dir' = dir </> subdir
+      files <- ls dir'
+      
+      -- For each file in this directory...
+      onlyfiles <- filterM (\fl -> isFile (dir' </> fl)) files
+      xs <- mapM (\x -> f (subdir </> x)) onlyfiles
+
+      -- For each subdirectory...
+      fromdirs <- filterM (\fl -> isDirectory (dir' </> fl)) files
+      xss <- forM fromdirs $ \d -> do
+        go (subdir </> d)
+      return $ concat (xs:xss)
 
 -- | Like @forEachFile@ but only performs a side effect.
 forEachFile_ :: FilePath -> (FilePath -> Shell ()) -> Shell ()
-forEachFile_ dir f = do
-  files <- map (dir </>) <$> ls dir
-  filterM isFile files >>= mapM_ f
-  fromdirs <- filterM isDirectory files
-  forM_ fromdirs $ \d -> do
-    forEachFile d f
+forEachFile_ root f = go ""
+  where
+    dir = if null root then "." else root
+    go subdir = do
+      let dir' = dir </> subdir
+      files <- ls dir'
+      filterM (\fl -> isFile (dir' </> fl)) files >>= mapM_ (f . (subdir </>))
+      fromdirs <- filterM (\fl -> isDirectory (dir' </> fl)) files
+      forM_ fromdirs $ \d -> go (subdir </> d)
 
 -- | Copy a file. Fails if the source is a directory. If the target is a
 --   directory, the source file is copied into that directory using its current
