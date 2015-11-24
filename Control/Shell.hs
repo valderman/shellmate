@@ -128,6 +128,7 @@ mv from to = liftIO $ Dir.renameFile from to
 --   current name.
 cpdir :: FilePath -> FilePath -> Shell ()
 cpdir fromdir todir = do
+    assert ("`" ++ fromdir ++ "' is not a directory") (isDirectory fromdir)
     exists <- isDirectory todir
     if exists
       then do
