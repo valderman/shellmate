@@ -128,38 +128,45 @@ mv from to = liftIO $ Dir.renameFile from to
 --   current name.
 cpdir :: FilePath -> FilePath -> Shell ()
 cpdir fromdir todir = do
-    dir <- isDirectory todir
-    if dir
-      then go fromdir todir id
-      else go fromdir todir (joinPath . drop 1 . splitPath)
+    when (not <$> isDirectory todir) $ mkdir True todir
+    go fromdir todir
   where
-    go from to dropFirstDir = do
-      forEachDirectory_ from (\dir -> mkdir True (to </> dropFirstDir dir))
+    go from to = do
+      forEachDirectory_ from (\dir -> echo (to </> dir) >> mkdir True (to </> dir))
       forEachFile_ from $ \file -> do
-        let file' = to </> dropFirstDir file
+        let file' = to </> file
         assert (errOverwrite file') (not <$> isDirectory file')
         cp file file'
     errOverwrite f = "cannot overwrite directory `" ++ f
                      ++ "' with non-directory"
 
 -- | Recursively perform an action on each subdirectory of the given directory.
+--   The path passed to the callback is relative to the given directory.
 --   The action will *not* be performed on the given directory itself.
 forEachDirectory :: FilePath -> (FilePath -> Shell a) -> Shell [a]
-forEachDirectory dir f = do
-  files <- map (dir </>) <$> ls dir
-  fromdirs <- filterM isDirectory files
-  xs <- forM fromdirs $ \d -> do
-    x <- f d
-    xs <- forEachDirectory d f
-    return (x:xs)
-  return (concat xs)
+forEachDirectory root f = go ""
+  where
+    dir = if null root then "." else root
+    go subdir = do
+      let dir' = dir </> subdir
+      files <- ls dir'
+      fromdirs <- filterM (\d -> isDirectory (dir' </> d)) files
+      xs <- forM fromdirs $ \d -> do
+        let d' = subdir </> d
+        x <- f d'
+        (x:) <$> go d'
+      return (concat xs)
 
 -- | Like 'forEachDirectory', but discards its result.
 forEachDirectory_ :: FilePath -> (FilePath -> Shell ()) -> Shell ()
-forEachDirectory_ dir f = do
-  files <- map (dir </>) <$> ls dir
-  fromdirs <- filterM isDirectory files
-  forM_ fromdirs $ \d -> f d >> forEachDirectory d f
+forEachDirectory_ root f = go ""
+  where
+    dir = if null root then "." else root
+    go subdir = do
+      let dir' = dir </> subdir
+      files <- ls dir'
+      fromdirs <- filterM (\d -> isDirectory (dir' </> d)) files
+      forM_ fromdirs $ \d -> let d' = subdir </> d in f d' >> go d'
 
 -- | Perform an action on each file in the given directory.
 --   This function will traverse any subdirectories of the given as well.
