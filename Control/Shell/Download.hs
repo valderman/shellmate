@@ -1,19 +1,23 @@
-{-# LANGUAGE FlexibleInstances, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, CPP #-}
 -- | High level functions for downloading files.
-module Control.Shell.Download (
-    URI,
-    fetch, fetchBytes,
-    fetchFile,
-    fetchTags, fetchXML, fetchFeed
+module Control.Shell.Download
+  ( URI
+  , fetch, fetchBytes
+  , fetchFile
+#if DOWNLOAD_EXTRAS
+  , fetchTags, fetchXML, fetchFeed
+#endif
   ) where
 import Data.ByteString as BS (ByteString, writeFile)
 import Data.String
 import Network.HTTP
 import qualified Network.URI as U
+#if DOWNLOAD_EXTRAS
 import Text.Feed.Import (parseFeedString)
 import Text.Feed.Types (Feed)
 import Text.HTML.TagSoup (Tag, parseTags)
 import Text.XML.Light (Content, parseXML)
+#endif
 import Control.Shell
 
 -- | A Uniform Resource Locator.
@@ -60,6 +64,7 @@ fetch = fetchSomething
 fetchFile :: FilePath -> URI -> Shell ()
 fetchFile file = fetchBytes >=> liftIO . BS.writeFile file
 
+#if DOWNLOAD_EXTRAS
 -- | Download the content as for 'fetch', but return it as a list of parsed
 --   tags using the tagsoup html parser.
 fetchTags :: URI -> Shell [Tag String]
@@ -76,3 +81,4 @@ fetchFeed :: URI -> Shell Feed
 fetchFeed uri = do
   str <- fetch uri
   assert ("could not parse feed from `" ++ uri ++ "'") (parseFeedString str)
+#endif
