@@ -26,16 +26,19 @@ library
     Control.Shell.Handle
     Control.Shell.Internal
   build-depends:
-    base          >=4.7  && <5,
-    transformers  >=0.3  && <0.5,
-    download-curl >=0.1  && <0.2,
-    feed          >=0.3  && <0.4,
-    tagsoup       >=0.13 && <0.14,
-    xml           >=1.3  && <1.4,
-    bytestring    >=0.10 && <0.11,
-    filepath      >=1.3  && <1.5,
-    process       >=1.1  && <1.5,
-    directory     >=1.1  && <1.3,
-    temporary     >=1.1  && <1.3
+    base          >=4.7    && <5,
+    transformers  >=0.3    && <0.5,
+    bytestring    >=0.10   && <0.11,
+    filepath      >=1.3    && <1.5,
+    process       >=1.1    && <1.5,
+    directory     >=1.1    && <1.3,
+    temporary     >=1.1    && <1.3,
+
+    -- for Control.Shell.Download
+    HTTP          >=4000.2 && <4000.3,
+    network-uri   >=2.6    && <2.7,
+    feed          >=0.3    && <0.4,
+    tagsoup       >=0.13   && <0.14,
+    xml           >=1.3    && <1.4
   ghc-options:
     -Wall
