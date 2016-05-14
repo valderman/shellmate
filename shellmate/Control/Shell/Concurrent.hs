@@ -27,8 +27,8 @@ type FinalizerHandle = IORef ThreadId
 --
 --   Note that all threads running in the same process share the same working
 --   directory and environment. It is thus highly inadvisable to change
---   environment variables or use relative paths from futures, as this will
---   almost certainly lead to race conditions.
+--   environment variables or the current working directory, or use relative
+--   paths from futures, as this will almost certainly lead to race conditions.
 data Future a = Future !FinalizerHandle !(MVar (Either ExitReason a))
 
 -- | Create a future value.
@@ -63,6 +63,8 @@ check (Future h v) = do
   maybe (pure Nothing) (fmap Just . fromResult) (h `seq` mx)
 
 -- | Perform the given computations in parallel.
+--   The race condition warning for 'Future' when modifying environment
+--   variables or using relative paths still applies.
 parallel :: [Shell a] -> Shell [a]
 parallel = mapM future >=> mapM await
 
