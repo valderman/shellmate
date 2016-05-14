@@ -14,6 +14,7 @@ import Control.Monad
 import Control.Shell
 import Data.IORef
 
+-- | Only used to have something reliable to attach the futures' weakrefs to.
 type FinalizerHandle = IORef ThreadId
 
 -- | A future is a computation which is run in parallel with a program's main
