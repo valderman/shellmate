@@ -323,7 +323,7 @@ guard = assert "Guard failed!"
 -- | Perform the given computation if the given guard passes, otherwise do
 --   nothing.
 --   Corresponds to 'CM.when'.
-when :: Guard g => g -> Shell a -> Shell ()
+when :: Guard g => g -> Shell () -> Shell ()
 when g m = do
   res <- try (guard g)
   case res of
@@ -333,5 +333,5 @@ when g m = do
 -- | Perform the given computation if the given guard fails, otherwise do
 --   nothing.
 --   Corresponds to 'CM.unless'.
-unless :: Guard g => g -> Shell a -> Shell ()
+unless :: Guard g => g -> Shell () -> Shell ()
 unless g m = void (guard g) `orElse` void m
