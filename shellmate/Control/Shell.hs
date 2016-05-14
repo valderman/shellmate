@@ -49,6 +49,7 @@ module Control.Shell (
 import Control.Applicative
 #endif
 import Control.Monad hiding (guard, when, unless)
+import qualified Control.Monad as CM (guard, when, unless)
 import System.FilePath
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
@@ -302,13 +303,11 @@ class Guard guard where
 instance Guard (Maybe a) where
   type Result (Maybe a) = a
   assert _ (Just x) = return x
-  assert ""  _      = fail $ "Guard failed!"
   assert desc _     = fail desc
 
 instance Guard Bool where
   type Result Bool = ()
   assert _ True = return ()
-  assert ""  _  = fail $ "Guard failed!"
   assert desc _ = fail desc
 
 instance Guard a => Guard (Shell a) where
@@ -317,11 +316,13 @@ instance Guard a => Guard (Shell a) where
 
 -- | Perform a Shell computation; if the computation succeeds but returns
 --   a false-ish value, the outer Shell computation fails.
+--   Corresponds to 'CM.guard'.
 guard :: Guard g => g -> Shell (Result g)
-guard = assert ""
+guard = assert "Guard failed!"
 
 -- | Perform the given computation if the given guard passes, otherwise do
 --   nothing.
+--   Corresponds to 'CM.when'.
 when :: Guard g => g -> Shell a -> Shell ()
 when g m = do
   res <- try (guard g)
@@ -331,5 +332,6 @@ when g m = do
 
 -- | Perform the given computation if the given guard fails, otherwise do
 --   nothing.
+--   Corresponds to 'CM.unless'.
 unless :: Guard g => g -> Shell a -> Shell ()
 unless g m = void (guard g) `orElse` void m
