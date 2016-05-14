@@ -22,7 +22,7 @@ library
   build-depends:
     base        >=4.7    && <5,
     bytestring  >=0.10   && <0.11,
-    HTTP        >=4000.2 && <4000.3,
+    HTTP        >=4000.2 && <4000.4,
     network-uri >=2.6    && <2.7,
     feed        >=0.3    && <0.4,
     tagsoup     >=0.13   && <0.14,
