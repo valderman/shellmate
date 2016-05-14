@@ -321,17 +321,15 @@ guard :: Guard g => g -> Shell (Result g)
 guard = assert "Guard failed!"
 
 -- | Perform the given computation if the given guard passes, otherwise do
---   nothing.
+--   nothing.The guard raising an error counts as failure as far as this
+--   function is concerned.
 --   Corresponds to 'CM.when'.
 when :: Guard g => g -> Shell () -> Shell ()
-when g m = do
-  res <- try (guard g)
-  case res of
-    Right _ -> void m
-    _       -> pure ()
+when g m = try (guard g) >> m
 
 -- | Perform the given computation if the given guard fails, otherwise do
---   nothing.
+--   nothing. The guard raising an error counts as failure as far as this
+--   function is concerned.
 --   Corresponds to 'CM.unless'.
 unless :: Guard g => g -> Shell () -> Shell ()
 unless g m = void (guard g) `orElse` void m
