@@ -24,6 +24,11 @@ type FinalizerHandle = IORef ThreadId
 --   is garbage collected. This means that a future should *always* be
 --   'await'ed at some point or otherwise kept alive, to ensure that the
 --   computation finishes.
+--
+--   Note that all threads running in the same process share the same working
+--   directory and environment. It is thus highly inadvisable to change
+--   environment variables or use relative paths from futures, as this will
+--   almost certainly lead to race conditions.
 data Future a = Future !FinalizerHandle !(MVar (Either ExitReason a))
 
 -- | Create a future value.
