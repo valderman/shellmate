@@ -35,6 +35,9 @@ instance MonadIO Shell where
       writeIORef globalEnv env
       m
 
+-- | Run a shell computation and return its result. If the computation calls
+--   'exit', the return value will be undefined. If the computation fails,
+--   an error will be thrown.
 shell_ :: Shell a -> IO a
 shell_ m = do
   res <- shell m

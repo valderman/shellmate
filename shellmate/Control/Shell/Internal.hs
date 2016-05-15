@@ -12,15 +12,22 @@ import qualified Control.Exception as Ex
 import qualified System.Exit as Exit
 import qualified System.Process as Proc
 import qualified System.IO as IO
+import qualified System.Directory as Dir (getCurrentDirectory)
+import qualified System.Environment as Env (getEnvironment)
 
 -- | A command name plus a ProcessHandle.
 data Pid = PID {pidName :: !String, pidHandle :: !Proc.ProcessHandle}
          | TID !(Conc.MVar (Maybe ExitReason)) !Conc.ThreadId
 
+-- | A shell environment: consists of the current standard input, output and
+--   error handles used by the computation, as well as the current working
+--   directory and set of environment variables.
 data Env = Env
-  { envStdIn  :: !IO.Handle
-  , envStdOut :: !IO.Handle
-  , envStdErr :: !IO.Handle
+  { envStdIn   :: !IO.Handle
+  , envStdOut  :: !IO.Handle
+  , envStdErr  :: !IO.Handle
+  , envWorkDir :: !FilePath
+  , envEnvVars :: ![(String, String)]
   }
 
 -- | A shell command: either an IO computation or a pipeline of at least one
@@ -62,9 +69,21 @@ data ExitReason = Success | Failure !String
   deriving (Show, Eq)
 
 -- | Run a shell computation. If part of the computation fails, the whole
---   computation fails.
+--   computation fails. The computation's environment is initially that of the
+--   whole process.
 shell :: Shell a -> IO (Either ExitReason a)
-shell = runSh (Env IO.stdin IO.stdout IO.stderr)
+shell m = do
+    evs <- Env.getEnvironment
+    wd <- Dir.getCurrentDirectory
+    runSh (env wd evs) m
+  where
+    env wd evs = Env
+      { envStdIn   = IO.stdin
+      , envStdOut  = IO.stdout
+      , envStdErr  = IO.stderr
+      , envWorkDir = wd
+      , envEnvVars = evs
+      }
 
 runSh :: Env -> Shell a -> IO (Either ExitReason a)
 runSh env (Lift m) = do
