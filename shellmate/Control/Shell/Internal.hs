@@ -122,8 +122,8 @@ runStep closefds Env{..} (Proc cmd args) = do
   where
     cproc = Proc.CreateProcess
       { Proc.cmdspec      = Proc.RawCommand cmd args
-      , Proc.cwd          = Nothing
-      , Proc.env          = Nothing
+      , Proc.cwd          = Just envWorkDir
+      , Proc.env          = Just envEnvVars
       , Proc.std_in       = Proc.UseHandle envStdIn
       , Proc.std_out      = Proc.UseHandle envStdOut
       , Proc.std_err      = Proc.UseHandle envStdErr
