@@ -4,7 +4,8 @@ module Control.Shell.Base
   ( MonadIO (..), shellEnv
   , shell_
   , stdin, echo, echo_, ask
-  , capture, stream, lift  
+  , capture, stream, lift
+  , takeEnvLock, releaseEnvLock, setShellEnv
   ) where
 import qualified System.Process as Proc
 import qualified System.IO as IO
@@ -21,6 +22,18 @@ globalEnvLock = unsafePerformIO $ Conc.newMVar ()
 {-# NOINLINE globalEnv #-}
 globalEnv :: IORef Env
 globalEnv = unsafePerformIO $ newIORef undefined
+
+-- | Take the global environment lock.
+takeEnvLock :: IO ()
+takeEnvLock = Conc.takeMVar globalEnvLock
+
+-- | Release the global environment lock.
+releaseEnvLock :: IO ()
+releaseEnvLock = Conc.putMVar globalEnvLock ()
+
+-- | Set the global shell environment.
+setShellEnv :: Env -> IO ()
+setShellEnv = writeIORef globalEnv
 
 -- | Get the current global shell environment, including standard input,
 --   output and error handles. Only safe to call within a computation lifted
