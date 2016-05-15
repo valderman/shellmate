@@ -1,26 +1,17 @@
-{-# LANGUAGE CPP, GADTs, RecordWildCards, GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, FlexibleInstances #-}
--- | Internal, hairy bits of Shellmate.
-module Control.Shell.Internal {- (
-    MonadIO (..), Shell, ExitReason (..),
-    shell, shell_,
-    (|>), exit,
-    run, run_, genericRun, runInteractive,
-    withTempDirectory, withCustomTempDirectory,
-    withTempFile, withCustomTempFile,
-    try
-  ) -} where
-import Control.Monad (when, ap, foldM, void, (>=>))
-import Control.Monad.IO.Class
+{-# LANGUAGE CPP, GADTs, RecordWildCards #-}
+-- | Primitives and run function.
+module Control.Shell.Internal
+  ( Shell
+  , ExitReason (..), Env (..)
+  , shell
+  , exit, run, try, getEnv, inEnv, unsafeLiftIO, (|>)
+  ) where
+import Control.Monad (when, ap)
 import qualified Control.Concurrent as Conc
 import qualified Control.Exception as Ex
-import Data.List (sort)
-import qualified System.Directory as Dir
-import qualified System.Environment as Env
 import qualified System.Exit as Exit
 import qualified System.Process as Proc
 import qualified System.IO as IO
-import qualified System.IO.Temp as Temp
-import System.IO.Unsafe
 
 -- | A command name plus a ProcessHandle.
 data Pid = PID {pidName :: !String, pidHandle :: !Proc.ProcessHandle}
@@ -34,86 +25,75 @@ data Env = Env
 
 -- | A shell command: either an IO computation or a pipeline of at least one
 --   step.
-data CMD a where
-  Lift :: !(IO a) -> CMD a
-  Pipe :: ![PipeStep] -> CMD ()
-  Bind :: CMD a -> (a -> CMD b) -> CMD b
-  Done :: CMD a
+data Shell a where
+  Lift   :: !(IO a) -> Shell a
+  Pipe   :: ![PipeStep] -> Shell ()
+  Bind   :: Shell a -> (a -> Shell b) -> Shell b
+  GetEnv :: Shell Env
+  InEnv  :: Env -> Shell a -> Shell a
+  Try    :: Shell a -> Shell (Either String a)
+  Done   :: Shell a
 
 -- | A step in a pipeline: either a shell computation or an external process.
 data PipeStep
   = Proc     !String ![String]
   | Internal !(Shell ())
 
-instance Functor CMD where
+instance Functor Shell where
   fmap f (Lift m) = Lift (fmap f m)
   fmap f (Pipe p) = Pipe p >> pure (f ())
 
-instance Applicative CMD where
+instance Applicative Shell where
   (<*>) = ap
   pure  = return
 
-instance Monad CMD where
+instance Monad Shell where
   return = Lift . return
   (>>=) = Bind
 
-instance MonadIO CMD where
-  liftIO = Lift
+-- | Lift an IO computation into a shell. The lifted computation is not
+--   thread-safe, and should thus absolutely not use environment variables,
+--   relative paths or standard input/output.
+unsafeLiftIO :: IO a -> Shell a
+unsafeLiftIO = Lift
 
--- | Monad for running shell commands. If a command fails, the entire
---   computation is aborted unless @try@ is used.
-newtype Shell a = Shell {unSh :: Env -> CMD a}
-
-instance Functor Shell where
-  fmap f (Shell m) = Shell $ fmap f . m
-
-instance Applicative Shell where
-  (<*>) = ap
-  pure = return
-
-instance Monad Shell where
-  return = Shell . const . return
-  Shell m >>= f = Shell $ \env -> do
-    x <- m env
-    unSh (f x) env
-
-instance MonadIO Shell where
-  liftIO m = Shell $ const $ liftIO m
-
+-- | Why did the computation terminate?
 data ExitReason = Success | Failure !String
   deriving (Show, Eq)
 
+-- | Run a shell computation. If part of the computation fails, the whole
+--   computation fails.
 shell :: Shell a -> IO (Either ExitReason a)
-shell = flip runSh (Env IO.stdin IO.stdout IO.stderr)
+shell = runSh (Env IO.stdin IO.stdout IO.stderr)
 
-shell_ :: Shell a -> IO a
-shell_ m = do
-  mx <- shell m
-  case mx of
-    Right x          -> return x
-    Left (Failure e) -> error e
-
-runSh :: Shell a -> Env -> IO (Either ExitReason a)
-runSh (Shell m) env = runCMD env (m env)
-
-runCMD :: Env -> CMD a -> IO (Either ExitReason a)
-runCMD env (Lift m) = do
+runSh :: Env -> Shell a -> IO (Either ExitReason a)
+runSh env (Lift m) = do
   Ex.catch (Right <$> m)
            (\(Ex.SomeException e) -> pure $ Left (Failure (show e)))
-runCMD env (Pipe p) = do
+runSh env (Pipe p) = do
   ((stepenv, step) : steps) <- mkEnvs env p
   ma <- waitPids =<< mapM (uncurry (runStep True)) steps
   mb <- waitPids . (:[]) =<< runStep False stepenv step
   case ma >> mb of
     Just err -> pure $ Left err
     _        -> pure $ Right ()
-runCMD _ Done = do
+runSh _ Done = do
   return $ Left Success
-runCMD env (Bind m f) = do
-  res <- runCMD env m
+runSh env (Bind m f) = do
+  res <- runSh env m
   case res of
-    Right x -> runCMD env (f x)
-    Left e  -> return $ Left e
+    Right x -> runSh env (f x)
+    Left e  -> pure $ Left e
+runSh env GetEnv = do
+  pure $ Right env
+runSh _ (InEnv env m) = do
+  runSh env m
+runSh env (Try m) = do
+  res <- runSh env m
+  case res of
+    Right x          -> pure $ Right (Right x)
+    Left (Failure e) -> pure $ Right (Left e)
+    Left Success     -> pure $ Left Success
 
 -- | Start a pipeline step.
 runStep :: Bool -> Env -> PipeStep -> IO Pid
@@ -136,7 +116,7 @@ runStep closefds Env{..} (Proc cmd args) = do
       }
 runStep closefds env (Internal cmd) = do
   v <- Conc.newEmptyMVar
-  tid <- Conc.forkFinally (runSh cmd env >>= done) $ \res -> do
+  tid <- Conc.forkFinally (runSh env cmd >>= done) $ \res -> do
     case res of
       Right (Left e) -> Conc.putMVar v (Just e)
       Left e         -> Conc.putMVar v (Just $ Failure $ show e)
@@ -187,56 +167,30 @@ waitPids _ = do
 --   magic is performed on either the command or arguments. The program's
 --   stdout will be written to stdout.
 run :: FilePath -> [String] -> Shell ()
-run p args = Shell $ \env -> Pipe [Proc p args]
+run p args = Pipe [Proc p args]
 
 -- | Terminate the program successfully.
 exit :: Shell a
-exit = Shell $ const Done
+exit = Done
 
-infixr 5 |>
+-- | Connect the standard output of the first argument to the standard input
+--   of the second argument, and run the two computations in parallel.
 (|>) :: Shell () -> Shell () -> Shell ()
-m |> n = Shell $ \env -> do
-  case (unSh m env, unSh n env) of
-    (Pipe m', Pipe n') -> Pipe (m' ++ n')
-    (Pipe m', _)       -> Pipe (m' ++ [Internal n])
-    (_, Pipe n')       -> Pipe (Internal m : n')
-    _                  -> Pipe [Internal m, Internal n]
+Pipe m |> Pipe n = Pipe (m ++ n)
+Pipe m |> n      = Pipe (m ++ [Internal n])
+m      |> Pipe n = Pipe (Internal m : n)
+m      |> n      = Pipe [Internal m, Internal n]
+infixl 5 |>
 
+-- | Run a computation in the given environment.
 inEnv :: Env -> Shell a -> Shell a
-inEnv e m = do
-  res <- liftIO $ runSh m e
-  case res of
-    Right x          -> pure x
-    Left Success     -> exit
-    Left (Failure e) -> fail e
+inEnv = InEnv
 
+-- | Get the current environment.
 getEnv :: Shell Env
-getEnv = Shell $ \env -> pure env
+getEnv = GetEnv
 
-capture :: Shell () -> Shell String
-capture m = do
-  env <- getEnv
-  (r, w) <- liftIO Proc.createPipe
-  inEnv (env {envStdOut = w}) m
-  liftIO $ IO.hClose w >> IO.hGetContents r
-
-stream :: (String -> String) -> Shell ()
-stream f = withStdOut (f <$> stdin)
-
-lift :: (String -> Shell String) -> Shell ()
-lift f = withStdOut (stdin >>= f)
-
-stdin :: Shell String
-stdin = Shell $ \env -> Lift $ do
-  IO.hGetContents (envStdIn env)
-
-withStdOut :: Shell String -> Shell ()
-withStdOut m = do
-  s <- m
-  Shell $ \env -> Lift $ IO.hPutStr (envStdOut env) s
-
-echo :: String -> Shell ()
-echo s = Shell $ \env -> Lift $ IO.hPutStrLn (envStdOut env) s
-
-ask :: Shell String
-ask = Shell $ \env -> Lift $ IO.hGetLine (envStdIn env)
+-- | Attempt to run a computation. If the inner computation fails, the outer
+--   computations returns its error message, otherwise its result is returned.
+try :: Shell a -> Shell (Either String a)
+try = Try
