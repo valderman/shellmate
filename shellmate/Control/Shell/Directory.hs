@@ -32,7 +32,7 @@ cpdir f t = do
         let file' = to </> file
         assert (errOverwrite file') (not <$> isDirectory file')
         cp (from </> file) file'
-    errOverwrite f = "cannot overwrite directory `" ++ f
+    errOverwrite d = "cannot overwrite directory `" ++ d
                      ++ "' with non-directory"
 
 -- | Recursively perform an action on each subdirectory of the given directory.

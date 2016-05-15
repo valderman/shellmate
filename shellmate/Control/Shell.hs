@@ -11,13 +11,13 @@ module Control.Shell
   , Guard (..), guard, when, unless
 
     -- * Environment handling
-  , withEnv, withoutEnv, lookupEnv, cmdline
+  , withEnv, withoutEnv, lookupEnv, getEnv, cmdline
 
     -- * Running external commands
   , MonadIO (..), Env (..)
   , run, sudo
   , unsafeLiftIO
-  , absPath, shellEnv, joinResult
+  , absPath, shellEnv, getShellEnv, joinResult, runSh
 
     -- * Working with directories
   , cpdir, pwd, ls, mkdir, rmdir, inDirectory, isDirectory
@@ -71,8 +71,12 @@ exitString Success      = ""
 exitString (Failure "") = "abnormal termination"
 exitString (Failure s)  = s
 
+-- | Get the complete environment for the current computation.
+getShellEnv :: Shell Env
+getShellEnv = CSB.getEnv
+
 insert :: Eq k => k -> v -> [(k, v)] -> [(k, v)]
-insert k' v' (kv@(k, v) : kvs)
+insert k' v' (kv@(k, _) : kvs)
   | k == k'   = (k', v') : kvs
   | otherwise = kv : insert k' v' kvs
 insert _ _ _  = []
