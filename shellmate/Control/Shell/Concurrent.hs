@@ -25,42 +25,38 @@ type FinalizerHandle = IORef ThreadId
 --   'await'ed at some point or otherwise kept alive, to ensure that the
 --   computation finishes.
 --
---   Note that all threads running in the same process share the same working
---   directory and environment. It is thus highly inadvisable to change
---   environment variables or the current working directory, or use relative
---   paths from futures, as this will almost certainly lead to race conditions.
+--   Note that all any code called in a future using 'unsafeLiftIO' must
+--   refrain from using environment variables, standard input/output, relative
+--   paths and the current working directory, in order to avoid race
+--   conditions. Code within the 'Shell' monad, code imported using 'liftIO'
+--   and external processes spawned from within 'Shell' is perfectly safe.
 data Future a = Future !FinalizerHandle !(MVar (Either ExitReason a))
 
 -- | Create a future value.
 future :: Shell a -> Shell (Future a)
-future m = liftIO $ do
-  v <- newEmptyMVar
-  tid <- forkIO $ shell m >>= putMVar v
-  -- We need a WeakRef to something that's not referenced by the computation
-  -- to be able to kill it when the result is not reachable. IORef to TID is
-  -- as good as anything.
-  r <- newIORef tid
-  _ <- mkWeakIORef r (killThread tid)
-  return $ Future r v
-
--- | Inspect a result from a previous shell computation and make it the result
---   of this computation as well.
-fromResult :: Either ExitReason a -> Shell a
-fromResult x =
-  case x of
-    Left Success       -> exit
-    Left (Failure err) -> fail err
-    Right x'           -> return x'
+future m = do
+  env <- getShellEnv
+  unsafeLiftIO $ do
+    v <- newEmptyMVar
+    tid <- forkIO $ runSh env m >>= putMVar v
+    -- We need a WeakRef to something that's not referenced by the computation
+    -- to be able to kill it when the result is not reachable. IORef to TID is
+    -- as good as anything.
+    r <- newIORef tid
+    _ <- mkWeakIORef r (killThread tid)
+    return $ Future r v
 
 -- | Wait for a future value.
 await :: Future a -> Shell a
-await (Future h v) = liftIO (readMVar v <* readIORef h) >>= fromResult
+await (Future h v) = joinResult $ unsafeLiftIO (readMVar v <* readIORef h)
 
 -- | Check whether a future value has arrived or not.
 check :: Future a -> Shell (Maybe a)
 check (Future h v) = do
-  mx <- liftIO $ tryReadMVar v <* readIORef h
-  maybe (pure Nothing) (fmap Just . fromResult) (h `seq` mx)
+  mx <- unsafeLiftIO $ tryReadMVar v <* readIORef h
+  case h `seq` mx of
+    Just x -> Just <$> joinResult (pure x)
+    _      -> pure Nothing
 
 -- | Perform the given computations in parallel.
 --   The race condition warning for 'Future' when modifying environment
