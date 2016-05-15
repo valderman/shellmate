@@ -16,7 +16,7 @@ import qualified System.Directory as Dir (getCurrentDirectory)
 import qualified System.Environment as Env (getEnvironment)
 
 -- | A command name plus a ProcessHandle.
-data Pid = PID {pidName :: !String, pidHandle :: !Proc.ProcessHandle}
+data Pid = PID !String                         !Proc.ProcessHandle
          | TID !(Conc.MVar (Maybe ExitReason)) !Conc.ThreadId
 
 -- | A shell environment: consists of the current standard input, output and
@@ -85,7 +85,7 @@ shell m = do
       }
 
 runSh :: Env -> Shell a -> IO (Either ExitReason a)
-runSh env (Lift m) = do
+runSh _ (Lift m) = do
   Ex.catch (Right <$> m)
            (\(Ex.SomeException e) -> pure $ Left (Failure (show e)))
 runSh env (Pipe p) = do
@@ -155,6 +155,7 @@ mkEnvs env = go [] (envStdIn env)
       go ((env {envStdIn = stdi, envStdOut = stdo}, step):acc) next steps
     go ((e, s) : steps) _ _ = do
       pure ((e {envStdOut = envStdOut env}, s) : steps)
+    go acc _ _ = pure acc
 
 -- | Terminate a pid, be it process or thread.
 killPid :: Pid -> IO ()
@@ -173,7 +174,7 @@ waitPids (PID cmd p : ps) = do
                               ++" code " ++ show ec
     _ -> do
       waitPids ps
-waitPids (TID v t : ps) = do
+waitPids (TID v _ : ps) = do
   merr <- Conc.takeMVar v
   case merr of
     Just e -> mapM_ killPid ps >> return (Just e)
