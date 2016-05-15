@@ -1,19 +1,27 @@
 -- | Basic operations such as reading input/output, etc.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Control.Shell.Base
-  ( MonadIO (..), shellEnv
+  ( module Control.Shell.Internal
+  , IO.Handle, FileMode (..)
+  , MonadIO (..), shellEnv
   , shell_
   , stdin, echo, echo_, ask
   , capture, stream, lift
-  , takeEnvLock, releaseEnvLock, setShellEnv
+  , takeEnvLock, releaseEnvLock, setShellEnv, joinResult
   ) where
 import qualified System.Process as Proc
 import qualified System.IO as IO
 import qualified Control.Concurrent as Conc
+import qualified System.Directory as Dir
+import qualified System.Environment as Env
 import Data.IORef
 import Control.Monad.IO.Class
 import System.IO.Unsafe
 import Control.Shell.Internal
+
+-- | Perform a file operation in binary or text mode?
+data FileMode = BinaryMode | TextMode
+  deriving (Show, Eq)
 
 {-# NOINLINE globalEnvLock #-}
 globalEnvLock :: Conc.MVar ()
@@ -24,16 +32,25 @@ globalEnv :: IORef Env
 globalEnv = unsafePerformIO $ newIORef undefined
 
 -- | Take the global environment lock.
-takeEnvLock :: IO ()
-takeEnvLock = Conc.takeMVar globalEnvLock
+takeEnvLock :: Shell ()
+takeEnvLock = unsafeLiftIO $ Conc.takeMVar globalEnvLock
 
 -- | Release the global environment lock.
-releaseEnvLock :: IO ()
-releaseEnvLock = Conc.putMVar globalEnvLock ()
+releaseEnvLock :: Shell ()
+releaseEnvLock = unsafeLiftIO $ Conc.putMVar globalEnvLock ()
 
--- | Set the global shell environment.
-setShellEnv :: Env -> IO ()
-setShellEnv = writeIORef globalEnv
+-- | Set the global shell environment to the one of the current computation.
+--   Returns the current global environment.
+--   Should never, ever, be called without holding the global environment lock.
+setShellEnv :: Env -> Shell Env
+setShellEnv env = unsafeLiftIO $ do
+  evs <- Env.getEnvironment
+  wd <- Dir.getCurrentDirectory
+  writeIORef globalEnv env
+  Dir.setCurrentDirectory (envWorkDir env)
+  mapM_ Env.unsetEnv (map fst evs)
+  mapM_ (uncurry Env.setEnv) (envEnvVars env)
+  return $ Env IO.stdin IO.stdout IO.stderr wd evs
 
 -- | Get the current global shell environment, including standard input,
 --   output and error handles. Only safe to call within a computation lifted
@@ -92,3 +109,12 @@ echo_ s = getEnv >>= unsafeLiftIO . flip IO.hPutStr s . envStdOut
 -- | Read a line of text from standard input.
 ask :: Shell String
 ask = getEnv >>= unsafeLiftIO . IO.hGetLine . envStdIn
+
+-- | Propagate an explicit 'ExitResult' through the computation.
+joinResult :: Shell (Either ExitReason a) -> Shell a
+joinResult m = do
+  res <- m
+  case res of
+    Right x          -> pure x
+    Left Success     -> exit
+    Left (Failure e) -> fail e

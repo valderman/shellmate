@@ -3,7 +3,7 @@
 module Control.Shell.Internal
   ( Shell
   , ExitReason (..), Env (..)
-  , shell
+  , shell, runSh
   , exit, run, try, getEnv, inEnv, unsafeLiftIO, (|>)
   ) where
 import Control.Monad (when, ap)
