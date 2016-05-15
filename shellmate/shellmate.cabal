@@ -25,6 +25,7 @@ library
     Control.Shell.Internal
     Control.Shell.Base
     Control.Shell.Temp
+    Control.Shell.Control
   build-depends:
     base         >=4.7  && <5,
     transformers >=0.3  && <0.5,
