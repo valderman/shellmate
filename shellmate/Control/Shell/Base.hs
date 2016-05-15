@@ -2,18 +2,20 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Control.Shell.Base
   ( module Control.Shell.Internal
+  , module System.FilePath
   , IO.Handle, FileMode (..)
   , MonadIO (..), shellEnv
   , shell_
   , stdin, echo, echo_, ask
   , capture, stream, lift
-  , takeEnvLock, releaseEnvLock, setShellEnv, joinResult
+  , takeEnvLock, releaseEnvLock, setShellEnv, joinResult, absPath
   ) where
 import qualified System.Process as Proc
 import qualified System.IO as IO
 import qualified Control.Concurrent as Conc
 import qualified System.Directory as Dir
 import qualified System.Environment as Env
+import System.FilePath
 import Data.IORef
 import Control.Monad.IO.Class
 import System.IO.Unsafe
@@ -22,6 +24,13 @@ import Control.Shell.Internal
 -- | Perform a file operation in binary or text mode?
 data FileMode = BinaryMode | TextMode
   deriving (Show, Eq)
+
+-- | Create an absolute path from the environment and a potentially relative
+--   path. Has no effect if the path is already absolute.
+absPath :: Env -> FilePath -> FilePath
+absPath env fp
+  | isAbsolute fp = fp
+  | otherwise     = envWorkDir env </> fp
 
 {-# NOINLINE globalEnvLock #-}
 globalEnvLock :: Conc.MVar ()
@@ -42,8 +51,8 @@ releaseEnvLock = unsafeLiftIO $ Conc.putMVar globalEnvLock ()
 -- | Set the global shell environment to the one of the current computation.
 --   Returns the current global environment.
 --   Should never, ever, be called without holding the global environment lock.
-setShellEnv :: Env -> Shell Env
-setShellEnv env = unsafeLiftIO $ do
+setShellEnv :: Env -> IO Env
+setShellEnv env = do
   evs <- Env.getEnvironment
   wd <- Dir.getCurrentDirectory
   writeIORef globalEnv env
@@ -62,8 +71,8 @@ instance MonadIO Shell where
   liftIO m = do
     env <- getEnv
     unsafeLiftIO $ Conc.withMVar globalEnvLock $ \_ -> do
-      writeIORef globalEnv env
-      m
+      oldenv <- setShellEnv env
+      m <* setShellEnv oldenv
 
 -- | Run a shell computation and return its result. If the computation calls
 --   'exit', the return value will be undefined. If the computation fails,

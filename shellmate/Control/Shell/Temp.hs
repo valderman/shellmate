@@ -13,12 +13,13 @@ withTempDirectory :: (FilePath -> Shell a) -> Shell a
 withTempDirectory act = joinResult $ do
   env <- getEnv
   takeEnvLock
-  oldenv <- setShellEnv env
   unsafeLiftIO $ do
-    Temp.withSystemTempDirectory "shellmate" $ \fp -> runSh env $ do
+    oldenv <- setShellEnv env
+    Temp.withSystemTempDirectory "shellmate" $ \fp -> do
       setShellEnv oldenv
-      releaseEnvLock
-      act fp
+      runSh env $ do
+        releaseEnvLock
+        act fp
 
 -- | Create a temp directory in given directory, do something with it, then
 --   remove it.
@@ -26,12 +27,13 @@ withCustomTempDirectory :: FilePath -> (FilePath -> Shell a) -> Shell a
 withCustomTempDirectory dir act = joinResult $ do
   env <- getEnv
   takeEnvLock
-  oldenv <- setShellEnv env
   unsafeLiftIO $ do
-    Temp.withTempDirectory dir "shellmate" $ \fp -> runSh env $ do
+    oldenv <- setShellEnv env
+    Temp.withTempDirectory dir "shellmate" $ \fp -> do
       setShellEnv oldenv
-      releaseEnvLock
-      act fp
+      runSh env $ do
+        releaseEnvLock
+        act fp
 
 -- | Create a temp file in the standard system temp directory, do something
 --   with it, then remove it.
@@ -39,13 +41,14 @@ withTempFile :: FileMode -> (FilePath -> IO.Handle -> Shell a) -> Shell a
 withTempFile fm act = joinResult $ do
   env <- getEnv
   takeEnvLock
-  oldenv <- setShellEnv env
   unsafeLiftIO $ do
-    Temp.withSystemTempFile "shellmate" $ \fp h -> runSh env $ do
+    oldenv <- setShellEnv env
+    Temp.withSystemTempFile "shellmate" $ \fp h -> do
       setShellEnv oldenv
-      releaseEnvLock
-      unsafeLiftIO $ IO.hSetBinaryMode h (fm == BinaryMode)
-      act fp h
+      runSh env $ do
+        releaseEnvLock
+        unsafeLiftIO $ IO.hSetBinaryMode h (fm == BinaryMode)
+        act fp h
 
 -- | Create a temp file in the standard system temp directory, do something
 --   with it, then remove it.
@@ -53,10 +56,11 @@ withCustomTempFile :: FileMode -> FilePath -> (FilePath -> IO.Handle -> Shell a)
 withCustomTempFile fm dir act = joinResult $ do
   env <- getEnv
   takeEnvLock
-  oldenv <- setShellEnv env
   unsafeLiftIO $ do
-    Temp.withTempFile dir "shellmate" $ \fp h -> runSh env $ do
+    oldenv <- setShellEnv env
+    Temp.withTempFile dir "shellmate" $ \fp h -> do
       setShellEnv oldenv
-      releaseEnvLock
-      unsafeLiftIO $ IO.hSetBinaryMode h (fm == BinaryMode)
-      act fp h
+      runSh env $ do
+        releaseEnvLock
+        unsafeLiftIO $ IO.hSetBinaryMode h (fm == BinaryMode)
+        act fp h
