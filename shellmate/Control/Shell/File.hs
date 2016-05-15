@@ -1,13 +1,26 @@
 -- | Working with files.
 module Control.Shell.File
-  ( IO.IOMode (..)
-  , rm, mv, cp
+  ( rm, mv, cp
+  , input, output
+  , IO.IOMode (..)
   , withFile, withBinaryFile
   , openFile, openBinaryFile
   ) where
 import qualified System.Directory as Dir
 import qualified System.IO as IO
 import Control.Shell.Base
+
+-- | Lazily read a file.
+input :: FilePath -> Shell String
+input f = do
+  e <- getEnv
+  unsafeLiftIO $ readFile (absPath e f)
+
+-- | Lazily write a file.
+output :: FilePath -> String -> Shell ()
+output f s = do
+  e <- getEnv
+  unsafeLiftIO $ writeFile (absPath e f) s
 
 -- | Remove a file.
 rm :: FilePath -> Shell ()
