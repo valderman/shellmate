@@ -47,8 +47,7 @@ data PipeStep
   | Internal !(Shell ())
 
 instance Functor Shell where
-  fmap f (Lift m) = Lift (fmap f m)
-  fmap f (Pipe p) = Pipe p >> pure (f ())
+  fmap f m = m >>= return . f
 
 instance Applicative Shell where
   (<*>) = ap
