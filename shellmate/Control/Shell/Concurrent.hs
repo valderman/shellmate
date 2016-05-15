@@ -6,9 +6,6 @@ module Control.Shell.Concurrent (
     parallel, parallel_,
     chunks
   ) where
-#if __GLASGOW_HASKELL__ <= 708
-import Control.Applicative
-#endif
 import Control.Concurrent
 import Control.Monad
 import Control.Shell
