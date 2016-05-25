@@ -40,6 +40,7 @@ data Shell a where
   InEnv  :: Env -> Shell a -> Shell a
   Try    :: Shell a -> Shell (Either String a)
   Done   :: Shell a
+  Fail   :: String -> Shell a
 
 -- | A step in a pipeline: either a shell computation or an external process.
 data PipeStep
@@ -55,7 +56,8 @@ instance Applicative Shell where
 
 instance Monad Shell where
   return = Lift . return
-  (>>=) = Bind
+  (>>=)  = Bind
+  fail   = Fail
 
 -- | Lift an IO computation into a shell. The lifted computation is not
 --   thread-safe, and should thus absolutely not use environment variables,
@@ -112,6 +114,8 @@ runSh env (Try m) = do
     Right x          -> pure $ Right (Right x)
     Left (Failure e) -> pure $ Right (Left e)
     Left Success     -> pure $ Left Success
+runSh _ (Fail e) = do
+  pure $ Left (Failure e)
 
 -- | Start a pipeline step.
 runStep :: Bool -> Env -> PipeStep -> IO Pid
