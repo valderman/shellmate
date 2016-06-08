@@ -37,9 +37,10 @@ module Control.Shell
     -- * Working with handles
   , Handle, IOMode (..)
   , hFlush, hClose
+  , getStdIn, getStdOut, getStdErr
 
     -- * Text I/O
-  , hPutStr, hPutStrLn, echo, echo_, ask
+  , hPutStr, hPutStrLn, echo, echo_, ask, stdin
   , hGetLine, hGetContents
 
     -- * ByteString I/O
@@ -126,3 +127,9 @@ inTempDirectory = withTempDirectory . flip inDirectory
 --   cleaned up after the command finishes.
 inCustomTempDirectory :: FilePath -> Shell a -> Shell a
 inCustomTempDirectory dir m = withCustomTempDirectory dir $ flip inDirectory m
+
+-- | Get the standard input, output and error handle respectively.
+getStdIn, getStdOut, getStdErr :: Shell Handle
+getStdIn  = envStdIn  <$> CSB.getEnv
+getStdOut = envStdOut <$> CSB.getEnv
+getStdErr = envStdErr <$> CSB.getEnv
