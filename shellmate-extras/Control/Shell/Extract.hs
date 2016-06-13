@@ -4,7 +4,7 @@ module Control.Shell.Extract
   ( -- * Extracting archives
     extract, extractWith, supportedExtensions, canExtract
     -- * Extraction options
-  , ExtractOptions, separateDirectory, extractVerbose, removeArchive
+  , ExtractOptions, separateDirectory, removeArchive
   , defaultExtractOptions
   ) where
 import Control.Shell
@@ -23,11 +23,6 @@ data ExtractOptions = ExtractOptions
     --   Default: @True@
     separateDirectory :: Bool
 
-    -- | Print verbose extraction output? If False, extraction will be silent.
-    --
-    --   Default: @False@
-  , extractVerbose    :: Bool
-
     -- | Remove the archive after extraction?
     --
     --   Default: @False@
@@ -38,7 +33,6 @@ data ExtractOptions = ExtractOptions
 defaultExtractOptions :: ExtractOptions
 defaultExtractOptions = ExtractOptions
   { separateDirectory = True
-  , extractVerbose    = False
   , removeArchive     = False
   }
 
@@ -87,7 +81,7 @@ extractWith opts file = do
     case extractCmd archive of
       Just (cmd, args)
         | canExtract file -> inDirectory outputDir $ do
-            maybeCapture $ run cmd (args ++ [archive] ++ verboseArgs)
+            void . capture $ run cmd (args ++ [archive])
             moveOutputToWorkDir archive
             when (separateDirectory opts) $ void $ try mergeOneLevelRoot
             when (removeArchive opts) $ rm archive
@@ -99,12 +93,6 @@ extractWith opts file = do
     outputDir
       | separateDirectory opts = takeBasestName file
       | otherwise              = "."
-    verboseArgs
-      | extractVerbose opts    = ["-v"]
-      | otherwise              = []
-    maybeCapture
-      | extractVerbose opts    = id
-      | otherwise              = void . capture
     mimeFail = fail $ concat
       [ "mime type does not seem to be an archive: "
       , BS.unpack $ defaultMimeLookup (T.pack file)
