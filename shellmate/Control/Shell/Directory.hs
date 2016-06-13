@@ -101,7 +101,7 @@ forEachFile_ r f = do
       fromdirs <- filterM (\fl -> isDirectory (dir' </> fl)) files
       forM_ fromdirs $ \d -> go dir (subdir </> d)
 
--- | List the contents of a directory, sans '.' and '..'.
+-- | List the contents of a directory, sans @.@ and @..@.
 ls :: FilePath -> Shell [FilePath]
 ls dir = do
   e <- getEnv
