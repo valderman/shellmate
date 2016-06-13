@@ -90,13 +90,15 @@ runSh :: Env -> Shell a -> IO (Either ExitReason a)
 runSh _ (Lift m) = do
   Ex.catch (Right <$> m)
            (\(Ex.SomeException e) -> pure $ Left (Failure (show e)))
-runSh env (Pipe p) = do
+runSh env (Pipe p) = flip Ex.catch except $ do
   ((stepenv, step) : steps) <- mkEnvs env p
   ma <- waitPids =<< mapM (uncurry (runStep True)) steps
   mb <- waitPids . (:[]) =<< runStep False stepenv step
   case ma >> mb of
     Just err -> pure $ Left err
     _        -> pure $ Right ()
+  where
+    except = \(Ex.SomeException e) -> pure $ Left (Failure (show e))
 runSh _ Done = do
   return $ Left Success
 runSh env (Bind m f) = do
