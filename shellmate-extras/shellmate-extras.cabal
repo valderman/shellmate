@@ -33,3 +33,5 @@ library
     shellmate   >=0.3.1  && <0.4
   default-language:
     Haskell2010
+  ghc-options:
+    -Wall
