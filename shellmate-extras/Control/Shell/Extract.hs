@@ -14,11 +14,14 @@ import Network.Mime
 import System.IO.Unsafe
 
 data ExtractOptions = ExtractOptions
-  { -- | Extract archive into a separate directory. The anme of the directory
+  { -- | Extract archive into a separate directory. The name of the directory
     --   will be the base name of the archive.
     --   If the archive contains a single directory on the top-level, the
     --   contents of that directory will be moved into the outer directory.
     --   This ensures that tarbombs and non-tarbombs are treated consistently.
+    --
+    --   If this option is set to @False@, archives will be unpacked into the
+    --   current working directory.
     --
     --   Default: @True@
     separateDirectory :: Bool
