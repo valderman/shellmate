@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Control.Shell.Extract
   ( -- * Extracting archives
-    extract, extractWith, supportedExtensions
+    extract, extractWith, supportedExtensions, canExtract
     -- * Extraction options
   , ExtractOptions, separateDirectory, extractVerbose, removeArchive
   , defaultExtractOptions
@@ -43,9 +43,10 @@ defaultExtractOptions = ExtractOptions
   }
 
 -- | The list of supported archive format file extensions.
---   On a typical Linux/OSX/Cygwin/MinGW system, .tar.gz, .tar.bz2, .tar.xz,
---   .tbz2, .tgz, .bz2, .gz and .xz should all be supported. If the appropriate
---   programs are installed, .zip, .rar and .7z should also be supported.
+--   On a typical Linux/OSX/Cygwin/MinGW system, .tar, .tar.gz, .tar.bz2,
+--   .tar.xz, .tbz2, .tgz, .bz2, .gz and .xz should all be supported.
+--   If the appropriate programs are installed, .zip, .rar and .7z should also
+--   be supported.
 supportedExtensions :: [String]
 supportedExtensions = unsafePerformIO $ do
   env <- shell_ $ getShellEnv
@@ -62,7 +63,15 @@ supportedExtensions = unsafePerformIO $ do
     Left _   -> pure []
     Right xs -> pure xs
   where
-     tarExts = [".tar.gz", ".tar.bz2", ".tar.xz", ".tbz2", ".tgz"]
+     tarExts = [".tar.gz", ".tar.bz2", ".tar.xz", ".tbz2", ".tgz", ".tar"]
+
+-- | Can the given file be extracted, as determined by comparing the file
+--   extension to the list of supported extensions.
+canExtract :: FilePath -> Bool
+canExtract f =
+    any (and . zipWith (==) f') (map reverse supportedExtensions)
+  where
+    f' = reverse f
 
 -- | Extract an archive with the default options. See 'ExtractOptions'
 --   for details.
@@ -76,12 +85,16 @@ extractWith opts file = do
     let archive = archivedir </> file
     mkdir True outputDir
     case extractCmd archive of
-      Nothing          -> mimeFail
-      Just (cmd, args) -> inDirectory outputDir $ do
-        maybeCapture $ run cmd (args ++ [archive] ++ verboseArgs)
-        moveOutputToWorkDir archive
-        when (separateDirectory opts) $ mergeOneLevelRoot `orElse` pure ()
-        when (removeArchive opts) $ rm archive
+      Just (cmd, args)
+        | canExtract file -> inDirectory outputDir $ do
+            maybeCapture $ run cmd (args ++ [archive] ++ verboseArgs)
+            moveOutputToWorkDir archive
+            when (separateDirectory opts) $ void $ try mergeOneLevelRoot
+            when (removeArchive opts) $ rm archive
+        | otherwise ->
+            supportFail cmd
+      Nothing ->
+            mimeFail
   where
     outputDir
       | separateDirectory opts = takeBasestName file
@@ -95,6 +108,10 @@ extractWith opts file = do
     mimeFail = fail $ concat
       [ "mime type does not seem to be an archive: "
       , BS.unpack $ defaultMimeLookup (T.pack file)
+      ]
+    supportFail cmd = fail $ concat
+      [ "unable to unpack archive, as the program `" ++ cmd ++ "' "
+      , "was not found"
       ]
 
 -- | If the current working directory contains a single directory, move all
