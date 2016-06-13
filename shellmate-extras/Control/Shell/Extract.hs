@@ -48,11 +48,11 @@ supportedExtensions = unsafePerformIO $ do
     tar <- (capture (run "tar" ["-?"]) >> pure tarExts) `orElse` pure []
     z7 <- (capture (run "7z" []) >> pure [".7z"]) `orElse` pure []
     rar <- (capture (run "unrar" []) >> pure [".rar"]) `orElse` pure []
-    zip <- (capture (run "unzip" []) >> pure [".zip"]) `orElse` pure []
+    z <- (capture (run "unzip" []) >> pure [".zip"]) `orElse` pure []
     xz <- (capture (run "xz" ["--help"]) >> pure [".xz"]) `orElse` pure []
     bz2 <- (capture (run "bunzip2" ["--help"]) >> pure [".bz2"]) `orElse` pure []
     gz <- (capture (run "gunzip" ["--help"]) >> pure [".gz"]) `orElse` pure []
-    pure $ concat [tar, z7, rar, zip, xz, bz2, gz]
+    pure $ concat [tar, z7, rar, z, xz, bz2, gz]
   case res of
     Left _   -> pure []
     Right xs -> pure xs
