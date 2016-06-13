@@ -18,7 +18,7 @@ withTempDirectory act = joinResult $ do
   unsafeLiftIO $ do
     oldenv <- setShellEnv env
     Temp.withSystemTempDirectory "shellmate" $ \fp -> do
-      setShellEnv oldenv
+      _ <- setShellEnv oldenv
       runSh env $ do
         releaseEnvLock
         act fp
@@ -32,7 +32,7 @@ withCustomTempDirectory dir act = joinResult $ do
   unsafeLiftIO $ do
     oldenv <- setShellEnv env
     Temp.withTempDirectory dir "shellmate" $ \fp -> do
-      setShellEnv oldenv
+      _ <- setShellEnv oldenv
       runSh env $ do
         releaseEnvLock
         x <- act fp
@@ -48,7 +48,7 @@ withTempFile fm act = joinResult $ do
   unsafeLiftIO $ do
     oldenv <- setShellEnv env
     Temp.withSystemTempFile "shellmate" $ \fp h -> do
-      setShellEnv oldenv
+      _ <- setShellEnv oldenv
       runSh env $ do
         releaseEnvLock
         unsafeLiftIO $ IO.hSetBinaryMode h (fm == BinaryMode)
@@ -63,7 +63,7 @@ withCustomTempFile fm dir act = joinResult $ do
   unsafeLiftIO $ do
     oldenv <- setShellEnv env
     Temp.withTempFile dir "shellmate" $ \fp h -> do
-      setShellEnv oldenv
+      _ <- setShellEnv oldenv
       runSh env $ do
         releaseEnvLock
         unsafeLiftIO $ IO.hSetBinaryMode h (fm == BinaryMode)
