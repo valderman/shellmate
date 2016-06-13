@@ -28,11 +28,20 @@ rm dir = do
   e <- getEnv
   unsafeLiftIO $ Dir.removeFile (absPath e dir)
 
--- | Rename a file.
+-- | Rename a file or directory. If the target is a directory, then the source
+--   will be moved into that directory.
 mv :: FilePath -> FilePath -> Shell ()
 mv from to = do
   e <- getEnv
-  unsafeLiftIO $ Dir.renameFile (absPath e from) (absPath e to)
+  unsafeLiftIO $ do
+    targetIsDir <- Dir.doesDirectoryExist (absPath e to)
+    sourceIsDir <- Dir.doesDirectoryExist (absPath e from)
+    if sourceIsDir
+      then Dir.renameDirectory (absPath e from) (targetPath targetIsDir e)
+      else Dir.renameFile (absPath e from) (targetPath targetIsDir e)
+  where
+    targetPath True e  = absPath e to </> takeBaseName from
+    targetPath False e = absPath e to
 
 -- | Copy a file. Fails if the source is a directory. If the target is a
 --   directory, the source file is copied into that directory using its current
