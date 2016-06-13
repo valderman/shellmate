@@ -4,6 +4,8 @@ module Control.Shell.Temp
   , withTempFile, withCustomTempFile
   ) where
 import Control.Shell.Base
+import Control.Shell.Directory (rmdir, isDirectory)
+import Control.Shell.Control (when)
 import qualified System.IO.Temp as Temp
 import qualified System.IO as IO
 
@@ -33,7 +35,9 @@ withCustomTempDirectory dir act = joinResult $ do
       setShellEnv oldenv
       runSh env $ do
         releaseEnvLock
-        act fp
+        x <- act fp
+        when (isDirectory fp) $ rmdir fp
+        return x
 
 -- | Create a temp file in the standard system temp directory, do something
 --   with it, then remove it.
