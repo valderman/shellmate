@@ -43,6 +43,9 @@ module Control.Shell
   , hPutStr, hPutStrLn, echo, echo_, ask, stdin
   , hGetLine, hGetContents
 
+    -- * Terminal text formatting
+  , module Control.Shell.Color
+
     -- * ByteString I/O
   , hGetBytes, hPutBytes, hGetByteLine, hGetByteContents
 
@@ -59,6 +62,7 @@ import Control.Shell.File
 import Control.Shell.Directory
 import Control.Shell.Temp
 import Control.Shell.Control
+import Control.Shell.Color
 import Control.Monad hiding (guard, when, unless)
 import System.FilePath
 
