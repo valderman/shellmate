@@ -29,7 +29,7 @@ module Control.Shell
   , withFile, withBinaryFile, openFile, openBinaryFile
 
     -- * Working with temporary files and directories
-  , FileMode
+  , FileMode (..)
   , withTempFile, withCustomTempFile
   , withTempDirectory, withCustomTempDirectory
   , inTempDirectory, inCustomTempDirectory
