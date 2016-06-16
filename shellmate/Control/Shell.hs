@@ -84,7 +84,7 @@ insert :: Eq k => k -> v -> [(k, v)] -> [(k, v)]
 insert k' v' (kv@(k, _) : kvs)
   | k == k'   = (k', v') : kvs
   | otherwise = kv : insert k' v' kvs
-insert _ _ _  = []
+insert k v _  = [(k, v)]
 
 delete :: Eq k => k -> [(k, v)] -> [(k, v)]
 delete k' (kv@(k, _) : kvs)
