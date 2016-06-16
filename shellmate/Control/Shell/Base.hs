@@ -7,7 +7,7 @@ module Control.Shell.Base
   , MonadIO (..), shellEnv
   , shell_
   , stdin, echo, echo_, ask
-  , capture, stream, lift
+  , capture, captureStdErr, capture2, stream, lift
   , takeEnvLock, releaseEnvLock, setShellEnv, joinResult, absPath
   ) where
 import qualified System.Process as Proc
@@ -92,6 +92,29 @@ capture m = do
   (r, w) <- unsafeLiftIO Proc.createPipe
   inEnv (env {envStdOut = w}) m
   unsafeLiftIO $ IO.hClose w >> IO.hGetContents r
+
+-- | Perform the given computation and return its standard error.
+captureStdErr :: Shell () -> Shell String
+captureStdErr m = do
+  env <- getEnv
+  (r, w) <- unsafeLiftIO Proc.createPipe
+  inEnv (env {envStdErr = w}) m
+  unsafeLiftIO $ IO.hClose w >> IO.hGetContents r
+
+-- | Perform the given computation and return its standard output and error,
+--   in that order.
+capture2 :: Shell () -> Shell (String, String)
+capture2 m = do
+  env <- getEnv
+  (ro, wo) <- unsafeLiftIO Proc.createPipe
+  (re, we) <- unsafeLiftIO Proc.createPipe
+  inEnv (env {envStdOut = wo, envStdErr = we}) m
+  unsafeLiftIO $ do
+    IO.hClose wo
+    IO.hClose we
+    o <- IO.hGetContents ro
+    e <- IO.hGetContents re
+    return (o, e)
 
 -- | Lift a pure function to a computation over standard input/output.
 --   Similar to 'interact'.
