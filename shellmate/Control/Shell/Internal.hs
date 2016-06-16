@@ -133,10 +133,17 @@ runStep closefds Env{..} (Proc cmd args) = do
       , Proc.std_out      = Proc.UseHandle envStdOut
       , Proc.std_err      = Proc.UseHandle envStdErr
       , Proc.close_fds    = closefds
+      , Proc.create_group = False
 #if MIN_VERSION_process(1,2,0)
       , Proc.delegate_ctlc = False
 #endif
-      , Proc.create_group = False
+#if MIN_VERSION_process(1,3,0)
+      , Proc.detach_console     = False
+      , Proc.create_new_console = False
+      , Proc.new_session        = False
+      , Proc.child_group        = Nothing
+      , Proc.child_user         = Nothing
+#endif
       }
 runStep closefds env (Internal cmd) = do
   v <- Conc.newEmptyMVar
