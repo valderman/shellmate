@@ -21,6 +21,7 @@ library
     Control.Shell
     Control.Shell.Concurrent
     Control.Shell.Daemon
+    Control.Shell.Posix
   other-modules:
     Control.Shell.Handle
     Control.Shell.Internal

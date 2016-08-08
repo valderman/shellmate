@@ -1,4 +1,5 @@
 -- | Daemonize a shellmate computation.
+--   Windows compatibility not guaranteed.
 module Control.Shell.Daemon
   ( CMode
   , daemonize
