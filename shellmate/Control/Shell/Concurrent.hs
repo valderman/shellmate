@@ -14,7 +14,6 @@ import Control.Shell
 import Control.Shell.Internal (inEnv)
 import Data.IORef
 import System.Process
-import System.IO (BufferMode (..), hSetBuffering)
 
 -- | Only used to have something reliable to attach the futures' weakrefs to.
 type FinalizerHandle = IORef ThreadId
@@ -95,7 +94,7 @@ fork2 m = do
   env <- getShellEnv
   (ri, wi) <- unsafeLiftIO createPipe
   (ro, wo) <- unsafeLiftIO createPipe
-  unsafeLiftIO $ mapM_ (flip hSetBuffering LineBuffering) [wi,wo]
+  mapM_ (flip hSetBuffering LineBuffering) [wi,wo]
   tid <- Control.Shell.Concurrent.forkIO $ do
     inEnv (env {envStdOut = wo, envStdIn = ri}) m
   return (wi, ro, tid)
@@ -107,7 +106,7 @@ fork3 m = do
   (ri, wi) <- unsafeLiftIO createPipe
   (ro, wo) <- unsafeLiftIO createPipe
   (re, we) <- unsafeLiftIO createPipe
-  unsafeLiftIO $ mapM_ (flip hSetBuffering LineBuffering) [wi,wo,we]
+  mapM_ (flip hSetBuffering LineBuffering) [wi,wo,we]
   tid <- inEnv (env {envStdOut = wo, envStdErr = we, envStdIn = ri}) $ do
     Control.Shell.Concurrent.forkIO m
   return (wi, ro, re, tid)

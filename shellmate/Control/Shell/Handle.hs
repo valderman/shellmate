@@ -1,9 +1,11 @@
 -- | Writing Shell programs using 'Handle's.
 module Control.Shell.Handle (
+    IO.BufferMode (..),
     hPutStr, hPutStrLn,
     hGetLine, hGetContents,
     hGetBytes, hPutBytes, hGetByteLine, hGetByteContents,
-    hFlush, hClose
+    hReady, hFlush, hClose,
+    hGetBuffering, hSetBuffering
   ) where
 import qualified System.IO as IO
 import qualified Data.ByteString as BS
@@ -24,6 +26,18 @@ hClose = unsafeLiftIO . IO.hClose
 -- | Flush a handle.
 hFlush :: IO.Handle -> Shell ()
 hFlush = unsafeLiftIO . IO.hFlush
+
+-- | Is the handle ready for reading?
+hReady :: IO.Handle -> Shell Bool
+hReady = unsafeLiftIO . IO.hReady
+
+-- | Set the buffering mode of the given handle.
+hSetBuffering :: IO.Handle -> IO.BufferMode -> Shell ()
+hSetBuffering h = unsafeLiftIO . IO.hSetBuffering h
+
+-- | Get the buffering mode of the given handle.
+hGetBuffering :: IO.Handle -> Shell IO.BufferMode
+hGetBuffering = unsafeLiftIO . IO.hGetBuffering
 
 -- | Read a line of input from a handle.
 hGetLine :: IO.Handle -> Shell String

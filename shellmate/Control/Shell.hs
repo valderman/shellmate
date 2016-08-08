@@ -35,8 +35,9 @@ module Control.Shell
   , inTempDirectory, inCustomTempDirectory
 
     -- * Working with handles
-  , Handle, IOMode (..)
-  , hFlush, hClose
+  , Handle, IOMode (..), BufferMode (..)
+  , hFlush, hClose, hReady
+  , hGetBuffering, hSetBuffering
   , getStdIn, getStdOut, getStdErr
 
     -- * Text I/O
