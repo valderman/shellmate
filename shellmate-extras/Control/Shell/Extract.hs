@@ -113,9 +113,9 @@ mergeOneLevelRoot = do
   [dir] <- ls "."
   guard $ isDirectory dir
   inCustomTempDirectory "." $ do
-    mv (".." </> dir) "."
+    mv (".." </> dir) ("." </> dir)
     files <- ls dir
-    mapM_ (\f -> mv (dir </> f) "..") files
+    mapM_ (\f -> mv (dir </> f) (".." </> f)) files
 
 -- | Command + arguments to extract an archive file.
 --   Arguments must be followed immediately by the archive file name.
@@ -155,6 +155,9 @@ moveOutputToWorkDir f = when needsWorkaround $ mv f' (takeFileName f')
 -- | Iterate 'takeBaseName' until all extensions are gone.
 takeBasestName :: FilePath -> FilePath
 takeBasestName f
-  | f == f'   = f
-  | otherwise = takeBasestName f'
-  where f' = takeBaseName f 
+  | f == f'      = f
+  | unknownExt f = f
+  | otherwise    = takeBasestName f'
+  where
+    f' = takeBaseName f
+    unknownExt f = defaultMimeLookup (T.pack f) == "application/octet-stream"
