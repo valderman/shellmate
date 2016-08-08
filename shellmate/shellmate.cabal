@@ -20,6 +20,7 @@ library
   exposed-modules:
     Control.Shell
     Control.Shell.Concurrent
+    Control.Shell.Daemon
   other-modules:
     Control.Shell.Handle
     Control.Shell.Internal
@@ -34,6 +35,7 @@ library
     transformers >=0.3  && <0.6,
     bytestring   >=0.10 && <0.11,
     filepath     >=1.3  && <1.5,
+    unix         >=2.7  && <2.8,
     process      >=1.1  && <1.5,
     directory    >=1.1  && <1.3,
     temporary    >=1.1  && <1.3
