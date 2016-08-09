@@ -16,6 +16,7 @@ module Control.Shell.Posix
   , otherReadMode, otherWriteMode, otherExecuteMode, otherModes
   , stdFileMode, accessModes
   , Control.Shell.Posix.setFileMode, getFileMode
+  , Control.Shell.Posix.setFileCreationMask
   ) where
 import System.Posix as Posix
 import Control.Shell
@@ -79,3 +80,7 @@ getOwnership file = liftIO $ do
   user <- userName <$> getUserEntryForID (fileOwner st)
   group <- groupName <$> getGroupEntryForID (fileGroup st)
   return (user, group)
+
+-- | Set the file creation mask of this process.
+setFileCreationMask :: CMode -> Shell CMode
+setFileCreationMask = unsafeLiftIO . Posix.setFileCreationMask

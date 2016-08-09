@@ -1,10 +1,6 @@
 -- | Daemonize a shellmate computation.
 --   Windows compatibility not guaranteed.
-module Control.Shell.Daemon
-  ( CMode
-  , daemonize
-  , Control.Shell.Daemon.setFileCreationMask
-  ) where
+module Control.Shell.Daemon (daemonize) where
 import System.Directory
 import System.Environment
 import System.Exit
@@ -21,7 +17,7 @@ daemonize :: Shell () -> Shell ()
 daemonize program = do
     env <- getShellEnv
     unsafeLiftIO $ do
-      System.Posix.setFileCreationMask 0
+      setFileCreationMask 0
       forkProcess (p env)
       exitImmediately ExitSuccess
   where
@@ -46,7 +42,3 @@ daemonize program = do
       case res of
         Left (Failure _) -> exitFailure
         _                -> exitSuccess
-
--- | Set the file creation mask of this process.
-setFileCreationMask :: CMode -> Shell CMode
-setFileCreationMask = unsafeLiftIO . System.Posix.setFileCreationMask
