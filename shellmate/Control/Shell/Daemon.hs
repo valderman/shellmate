@@ -1,18 +1,14 @@
-{-# LANGUAGE CPP, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 -- | Daemonize a shellmate computation.
 --   Windows compatibility only with Cygwin.
 module Control.Shell.Daemon (daemonize) where
-import System.Directory
-import System.Exit
-import System.IO
 import Control.Shell hiding (stdin)
 
 #ifdef WITH_POSIX
+import System.Directory
+import System.Exit
+import System.IO
 import System.Posix
-#else
-#include "windows_cconv.h"
-foreign import WINDOWS_CCONV unsafe "windows.h FreeConsole"
-        freeConsole :: IO ()
 #endif
 
 -- | Daemonize a shellmate computation. This should be the last thing a
@@ -21,14 +17,9 @@ foreign import WINDOWS_CCONV unsafe "windows.h FreeConsole"
 --   mask to 0, closing standard input, output and error file descriptors,
 --   blocking sighup and changing the working directory to @/@.
 --
---   On Windows without Cygwin, @daemonize@ only detaches the process from the
---   console in which it is running. On Windows, consider running any program
---   intended to be deamonized using @START /B your_app@, or better yet,
---   rewrite it as a Windows service.
---   Note that any non-service process will still be terminated if the starting
---   user logs out.
---
---   With Cygwin, this function behaves as on non-Windows platforms.
+--   On Windows without Cygwin, @daemonize@ is a no-op. Consider running any
+--   program intended to be deamonized using @START /B your_app@, or better yet,
+--   rewriting it as a Windows service.
 daemonize :: Shell () -> Shell ()
 #ifdef WITH_POSIX
 daemonize m = do
@@ -60,5 +51,5 @@ daemonize m = do
         Left (Failure _) -> exitFailure
         _                -> exitSuccess
 #else
-daemonize m = freeConsole >> m
+daemonize m = m
 #endif
