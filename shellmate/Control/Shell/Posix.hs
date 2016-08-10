@@ -1,5 +1,6 @@
--- | Working with users, groups, file permissions and file ownerships.
---   Windows compatibility not guaranteed.
+-- | Working with daemons, users, groups, file permissions and file ownerships.
+--   Not present on Windows unless shellmate is installed with the @with-posix@
+--   flag.
 module Control.Shell.Posix
   ( -- * Users and groups
     User, Group
@@ -17,9 +18,13 @@ module Control.Shell.Posix
   , stdFileMode, accessModes
   , Control.Shell.Posix.setFileMode, getFileMode
   , Control.Shell.Posix.setFileCreationMask
+
+    -- * Daemonizing shell computations
+  , daemonize
   ) where
 import System.Posix as Posix
 import Control.Shell
+import Control.Shell.Daemon
 
 type User = String
 type Group = String

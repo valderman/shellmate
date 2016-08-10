@@ -26,7 +26,6 @@ library
   exposed-modules:
     Control.Shell
     Control.Shell.Concurrent
-    Control.Shell.Daemon
   other-modules:
     Control.Shell.Handle
     Control.Shell.Internal
@@ -51,4 +50,5 @@ library
   if flag(with-posix) || !os(windows)
     cpp-options:     -DWITH_POSIX
     exposed-modules: Control.Shell.Posix
+    other-modules:   Control.Shell.Daemon
     build-depends:   unix >=2.7 && <2.8

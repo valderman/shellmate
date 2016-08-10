@@ -1,15 +1,12 @@
-{-# LANGUAGE CPP #-}
 -- | Daemonize a shellmate computation.
---   Windows compatibility only with Cygwin.
+--   Not present on Windows, unless shellmate is installed with the
+--   @with-posix@ flag.
 module Control.Shell.Daemon (daemonize) where
 import Control.Shell hiding (stdin)
-
-#ifdef WITH_POSIX
 import System.Directory
 import System.Exit
 import System.IO
 import System.Posix
-#endif
 
 -- | Daemonize a shellmate computation. This should be the last thing a
 --   computation does, as this function will terminate the parent computation.
@@ -21,7 +18,6 @@ import System.Posix
 --   program intended to be deamonized using @START /B your_app@, or better yet,
 --   rewriting it as a Windows service.
 daemonize :: Shell () -> Shell ()
-#ifdef WITH_POSIX
 daemonize m = do
     env <- getShellEnv
     unsafeLiftIO $ do
@@ -50,6 +46,3 @@ daemonize m = do
       case res of
         Left (Failure _) -> exitFailure
         _                -> exitSuccess
-#else
-daemonize m = m
-#endif
