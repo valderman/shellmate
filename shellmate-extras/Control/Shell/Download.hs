@@ -7,9 +7,12 @@ module Control.Shell.Download
   , fetchTags, fetchXML, fetchFeed
   ) where
 import Data.ByteString as BS (ByteString, writeFile)
+import Data.ByteString.UTF8 as BS
+import Data.ByteString.Lazy as LBS
+import Data.ByteString.Lazy.UTF8 as LBS
 import Data.String
-import Network.HTTP
-import qualified Network.URI as U
+import Network.HTTP.Simple
+import Network.HTTP.Types
 import Text.Feed.Import (parseFeedString)
 import Text.Feed.Types (Feed)
 import Text.HTML.TagSoup (Tag, parseTags)
@@ -26,39 +29,33 @@ liftE m = do
     Left e  -> fail (show e)
     Right x -> return x
 
-httpFail :: (Int, Int, Int) -> String -> Shell a
-httpFail (a,b,c) reason =
-  fail $ "HTTP error " ++ concat [show a, show b, show c] ++ ": " ++ reason
+httpFail :: Int -> BS.ByteString -> Shell a
+httpFail code reason =
+  fail $ "HTTP error " ++ show code ++ ": " ++ BS.toString reason
 
-fetchSomething :: (IsString a, HStream a) => URI -> Shell a
+fetchSomething :: URI -> Shell LBS.ByteString
 fetchSomething uri = do
-    u <- assert ("could not parse URI `" ++ uri ++ "'") (U.parseURI uri)
-    rsp <- liftE $ simpleHTTP (req u)
-    case rspCode rsp of
-      (2,_,_) -> return (rspBody rsp)
-      code    -> httpFail code (rspReason rsp)
-  where
-    req u = Request {
-        rqURI = u,
-        rqMethod = GET,
-        rqHeaders = [],
-        rqBody = ""
-      }
+  req <- assert ("could not parse URI `" ++ uri ++ "'") $ do
+    try $ liftIO $ parseRequest uri
+  rsp <- httpLBS req
+  case getResponseStatus rsp of
+    (Status 200 _)       -> return (getResponseBody rsp)
+    (Status code reason) -> httpFail code reason
 
--- | Download content specified by a url using curl, returning the content
+-- | Download content specified by a URL, returning the content
 --   as a strict 'ByteString'.
-fetchBytes :: URI -> Shell ByteString
-fetchBytes = fetchSomething
+fetchBytes :: URI -> Shell BS.ByteString
+fetchBytes = fmap LBS.toStrict . fetchSomething
 
--- | Download content specified by a url using curl, returning the content
---   as a 'String'.
+-- | Download content specified by a URL, returning the content
+--   as a 'String'. The content is interpreted as UTF8.
 fetch :: URI -> Shell String
-fetch = fetchSomething
+fetch = fmap LBS.toString . fetchSomething
 
--- | Download content specified by a url using curl, writing the content to
+-- | Download content specified by a URL, writing the content to
 --   the file specified by the given 'FilePath'.
 fetchFile :: FilePath -> URI -> Shell ()
-fetchFile file = fetchBytes >=> liftIO . BS.writeFile file
+fetchFile file = fetchSomething >=> liftIO . LBS.writeFile file
 
 -- | Download the content as for 'fetch', but return it as a list of parsed
 --   tags using the tagsoup html parser.
