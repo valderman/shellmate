@@ -26,6 +26,11 @@ class Guard guard where
   --   error message.
   assert :: String -> guard -> Shell (Result guard)
 
+instance Guard (Either l r) where
+  type Result (Either l r) = r
+  assert _ (Right x) = return x
+  assert desc _      = fail desc
+
 instance Guard (Maybe a) where
   type Result (Maybe a) = a
   assert _ (Just x) = return x
