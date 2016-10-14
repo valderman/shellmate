@@ -71,5 +71,5 @@ fetchXML = fmap parseXML . fetch
 --   Atom content, using the feed library parser.
 fetchFeed :: URI -> Shell Feed
 fetchFeed uri = do
-  str <- fetch uri
+  str <- LBS.toString <$> fetchSomething uri
   assert ("could not parse feed from `" ++ uri ++ "'") (parseFeedString str)
