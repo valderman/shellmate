@@ -94,9 +94,10 @@ runSh env (Pipe p) = flip Ex.catch except $ do
   ((stepenv, step) : steps) <- mkEnvs env p
   ma <- waitPids =<< mapM (uncurry (runStep True)) steps
   mb <- waitPids . (:[]) =<< runStep False stepenv step
-  case ma >> mb of
-    Just err -> pure $ Left err
-    _        -> pure $ Right ()
+  case (ma, mb) of
+    (Failure err, _) -> pure $ Left (Failure err)
+    (_, Failure err) -> pure $ Left (Failure err)
+    _                -> pure $ Right ()
   where
     except = \(Ex.SomeException e) -> pure $ Left (Failure (show e))
 runSh _ Done = do
@@ -177,23 +178,23 @@ killPid (TID _ t) = Conc.killThread t
 
 -- | Wait for all processes in the given list. If a process has failed, its
 --   error message is returned and the rest are killed.
-waitPids :: [Pid] -> IO (Maybe ExitReason)
+waitPids :: [Pid] -> IO ExitReason
 waitPids (PID cmd p : ps) = do
   exCode <- Proc.waitForProcess p
   case exCode of
     Exit.ExitFailure ec -> do
       mapM_ killPid ps
-      return . Just $ Failure $ "Command '" ++ cmd ++ "' failed with error "
-                              ++" code " ++ show ec
+      return . Failure $ concat
+        ["Command `", cmd, "' failed with error code ", show ec]
     _ -> do
       waitPids ps
 waitPids (TID v _ : ps) = do
   merr <- Conc.takeMVar v
   case merr of
-    Just e -> mapM_ killPid ps >> return (Just e)
+    Just e -> mapM_ killPid ps >> return e
     _      -> waitPids ps
 waitPids _ = do
-  return Nothing
+  return Success
 
 -- | Execute an external command. No globbing, escaping or other external shell
 --   magic is performed on either the command or arguments. The program's
