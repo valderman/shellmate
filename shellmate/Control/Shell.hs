@@ -6,7 +6,7 @@ module Control.Shell
   , shell, shell_, exitString
 
     -- * Error handling and control flow
-  , (|>), capture, captureStdErr, capture2, stream, lift
+  , (|>), capture, captureStdErr, capture2, capture3, stream, lift
   , try, orElse, exit
   , Guard (..), guard, when, unless
 
