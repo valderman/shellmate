@@ -164,11 +164,12 @@ runStep closefds env (Internal cmd) = do
 mkEnvs :: Env -> [PipeStep] -> IO [(Env, PipeStep)]
 mkEnvs env = go [] (envStdIn env)
   where
+    go acc stdi [step] = do
+      let env' = env {envStdIn = stdi, envStdOut = envStdOut env}
+      pure ((env', step) : acc)
     go acc stdi (step : steps) = do
       (next, stdo) <- Proc.createPipe
       go ((env {envStdIn = stdi, envStdOut = stdo}, step):acc) next steps
-    go ((e, s) : steps) _ _ = do
-      pure ((e {envStdOut = envStdOut env}, s) : steps)
     go acc _ _ = pure acc
 
 -- | Terminate a pid, be it process or thread.

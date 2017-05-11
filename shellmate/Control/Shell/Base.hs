@@ -91,16 +91,24 @@ capture :: Shell () -> Shell String
 capture m = do
   env <- getEnv
   (r, w) <- unsafeLiftIO Proc.createPipe
+  v <- unsafeLiftIO $ Conc.newEmptyMVar
+  unsafeLiftIO $ Conc.forkIO $ do
+    s <- IO.hGetContents r
+    Conc.putMVar v $! length s `seq` s
   inEnv (env {envStdOut = w}) m
-  unsafeLiftIO $ IO.hClose w >> IO.hGetContents r
+  unsafeLiftIO $ IO.hClose w >> Conc.takeMVar v
 
 -- | Perform the given computation and return its standard error.
 captureStdErr :: Shell () -> Shell String
 captureStdErr m = do
   env <- getEnv
   (r, w) <- unsafeLiftIO Proc.createPipe
+  v <- unsafeLiftIO $ Conc.newEmptyMVar
+  unsafeLiftIO $ Conc.forkIO $ do
+    s <- IO.hGetContents r
+    Conc.putMVar v $! length s `seq` s
   inEnv (env {envStdErr = w}) m
-  unsafeLiftIO $ IO.hClose w >> IO.hGetContents r
+  unsafeLiftIO $ IO.hClose w >> Conc.takeMVar v
 
 -- | Perform the given computation and return its standard output and error,
 --   in that order.
@@ -109,12 +117,19 @@ capture2 m = do
   env <- getEnv
   (ro, wo) <- unsafeLiftIO Proc.createPipe
   (re, we) <- unsafeLiftIO Proc.createPipe
+  vo <- unsafeLiftIO $ Conc.newEmptyMVar
+  ve <- unsafeLiftIO $ Conc.newEmptyMVar
+  unsafeLiftIO $ Conc.forkIO $ do
+    so <- IO.hGetContents ro
+    se <- IO.hGetContents re
+    Conc.putMVar vo $! length so `seq` so
+    Conc.putMVar ve $! length se `seq` se
   inEnv (env {envStdOut = wo, envStdErr = we}) m
   unsafeLiftIO $ do
     IO.hClose wo
     IO.hClose we
-    o <- IO.hGetContents ro
-    e <- IO.hGetContents re
+    o <- Conc.takeMVar vo
+    e <- Conc.takeMVar ve
     return (o, e)
 
 -- | Perform the given computation and return its standard output and error,
@@ -124,12 +139,19 @@ capture3 m = do
   env <- getEnv
   (ro, wo) <- unsafeLiftIO Proc.createPipe
   (re, we) <- unsafeLiftIO Proc.createPipe
+  vo <- unsafeLiftIO $ Conc.newEmptyMVar
+  ve <- unsafeLiftIO $ Conc.newEmptyMVar
+  unsafeLiftIO $ Conc.forkIO $ do
+    so <- IO.hGetContents ro
+    se <- IO.hGetContents re
+    Conc.putMVar vo $! length so `seq` so
+    Conc.putMVar ve $! length se `seq` se
   res <- inEnv (env {envStdOut = wo, envStdErr = we}) $ try m
   unsafeLiftIO $ do
     IO.hClose wo
     IO.hClose we
-    o <- IO.hGetContents ro
-    e <- IO.hGetContents re
+    o <- Conc.takeMVar vo
+    e <- Conc.takeMVar ve
     return (o, e, either Failure (const Success) res)
 
 -- | Lift a pure function to a computation over standard input/output.
