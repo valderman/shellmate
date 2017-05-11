@@ -6,7 +6,7 @@ module Control.Shell.Internal
   , shell, runSh
   , exit, run, try, getEnv, inEnv, unsafeLiftIO, (|>)
   ) where
-import Control.Monad (when, ap)
+import Control.Monad (when, ap, forM)
 import qualified Control.Concurrent as Conc
 import qualified Control.Exception as Ex
 import qualified System.Exit as Exit
@@ -91,13 +91,12 @@ runSh _ (Lift m) = do
   Ex.catch (Right <$> m)
            (\(Ex.SomeException e) -> pure $ Left (Failure (show e)))
 runSh env (Pipe p) = flip Ex.catch except $ do
-  ((stepenv, step) : steps) <- mkEnvs env p
-  ma <- waitPids =<< mapM (uncurry (runStep True)) steps
-  mb <- waitPids . (:[]) =<< runStep False stepenv step
-  case (ma, mb) of
-    (Failure err, _) -> pure $ Left (Failure err)
-    (_, Failure err) -> pure $ Left (Failure err)
-    _                -> pure $ Right ()
+  steps <- mkEnvs env p
+  pids <- mapM (uncurry (runStep True)) steps
+  ma <- waitPids pids
+  case ma of
+    Failure err -> pure $ Left (Failure err)
+    _           -> pure $ Right ()
   where
     except = \(Ex.SomeException e) -> pure $ Left (Failure (show e))
 runSh _ Done = do
