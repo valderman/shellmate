@@ -14,6 +14,7 @@ import qualified System.Process as Proc
 import qualified System.IO as IO
 import qualified System.Directory as Dir (getCurrentDirectory)
 import qualified System.Environment as Env (getEnvironment)
+import qualified System.Info as Info (os)
 
 -- | A command name plus a ProcessHandle.
 data Pid = PID !String                         !Proc.ProcessHandle
@@ -92,12 +93,15 @@ runSh _ (Lift m) = do
            (\(Ex.SomeException e) -> pure $ Left (Failure (show e)))
 runSh env (Pipe p) = flip Ex.catch except $ do
   steps <- mkEnvs env p
-  pids <- mapM (uncurry (runStep True)) steps
+  pids <- mapM (uncurry (runStep closeFDs)) steps
   ma <- waitPids pids
   case ma of
     Failure err -> pure $ Left (Failure err)
     _           -> pure $ Right ()
   where
+    closeFDs
+      | Info.os == "mingw32" = False
+      | otherwise            = True
     except = \(Ex.SomeException e) -> pure $ Left (Failure (show e))
 runSh _ Done = do
   return $ Left Success
@@ -143,6 +147,9 @@ runStep closefds Env{..} (Proc cmd args) = do
       , Proc.new_session        = False
       , Proc.child_group        = Nothing
       , Proc.child_user         = Nothing
+#endif
+#if MIN_VERSION_process(1,5,0)
+      , Proc.use_process_jobs   = False
 #endif
       }
 runStep closefds env (Internal cmd) = do

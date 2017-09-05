@@ -1,5 +1,5 @@
 name:                shellmate
-version:             0.3.4.2
+version:             0.3.4.3
 synopsis:            Simple interface for shell scripting in Haskell.
 description:         Monadic EDSL for writing cross-platform shell scripts in Haskell.
 homepage:            https://github.com/valderman/shellmate

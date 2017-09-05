@@ -58,8 +58,8 @@ setShellEnv env = do
   wd <- Dir.getCurrentDirectory
   writeIORef globalEnv env
   Dir.setCurrentDirectory (envWorkDir env)
-  mapM_ Env.unsetEnv (map fst evs)
-  mapM_ (uncurry Env.setEnv) (envEnvVars env)
+  mapM_ Env.unsetEnv (filter (not . null) $ map fst evs)
+  mapM_ (uncurry Env.setEnv) (filter (not . null . fst) $ envEnvVars env)
   return $ Env IO.stdin IO.stdout IO.stderr wd evs
 
 -- | Get the current global shell environment, including standard input,

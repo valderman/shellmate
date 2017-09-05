@@ -122,7 +122,21 @@ mkdir _    dir = do
 rmdir :: FilePath -> Shell ()
 rmdir dir = do
   e <- getEnv
-  unsafeLiftIO $ Dir.removeDirectoryRecursive (absPath e dir)
+  unsafeLiftIO $ do
+    let p = absPath e dir
+    makeWritableRecursive p
+    Dir.removeDirectoryRecursive p
+
+-- Needed to recursively remove directories with read-only files on Windows.
+-- Thanks to Ruud @ https://stackoverflow.com/questions/38926895/haskell-removedirectoryrecursive-permission-denied-on-windows
+makeWritableRecursive :: FilePath -> IO ()
+makeWritableRecursive path = do
+  permissions <- Dir.getPermissions path
+  Dir.setPermissions path (Dir.setOwnerWritable True permissions)
+  isDirectory <- Dir.doesDirectoryExist path
+  Control.Monad.when isDirectory $ do
+    contents <- Dir.getDirectoryContents path
+    forM_ [path </> item | item <- contents, item /= "." && item /= ".."] makeWritableRecursive
 
 -- | Do something with the user's home directory.
 withHomeDirectory :: (FilePath -> Shell a) -> Shell a
