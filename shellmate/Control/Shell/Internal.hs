@@ -10,9 +10,11 @@ import Control.Monad (when, ap, forM)
 import Control.Monad.Fail
 import qualified Control.Concurrent as Conc
 import qualified Control.Exception as Ex
+import qualified Data.IORef as IORef
 import qualified System.Exit as Exit
 import qualified System.Process as Proc
 import qualified System.IO as IO
+import qualified System.IO.Unsafe as IO
 import qualified System.Directory as Dir (getCurrentDirectory)
 import qualified System.Environment as Env (getEnvironment)
 import qualified System.Info as Info (os)
@@ -59,6 +61,7 @@ instance Applicative Shell where
 instance Monad Shell where
   return = Lift . return
   (>>=)  = Bind
+  fail   = Fail
 
 instance MonadFail Shell where
   fail = Fail
@@ -73,11 +76,20 @@ unsafeLiftIO = Lift
 data ExitReason = Success | Failure !String
   deriving (Show, Eq)
 
+{-# NOINLINE warningRef #-}
+warningRef :: IORef.IORef Bool
+warningRef = IO.unsafePerformIO $ IORef.newIORef False
+
 -- | Run a shell computation. If part of the computation fails, the whole
 --   computation fails. The computation's environment is initially that of the
 --   whole process.
 shell :: Shell a -> IO (Either ExitReason a)
 shell m = do
+    alreadyPrintedWarning <- IORef.atomicModifyIORef warningRef $ \x -> (True, x)
+    when (not Conc.rtsSupportsBoundThreads && not alreadyPrintedWarning) $ do
+      IO.hPutStrLn IO.stderr "WARNING: your program is not linked against the threaded GHC runtime."
+      IO.hPutStrLn IO.stderr "You should REALLY build your program with -threaded,"
+      IO.hPutStrLn IO.stderr "or you may experience deadlocks."
     evs <- Env.getEnvironment
     wd <- Dir.getCurrentDirectory
     runSh (env wd evs) m

@@ -52,7 +52,7 @@ guard :: Guard g => g -> Shell (Result g)
 guard = assert "Guard failed!"
 
 -- | Perform the given computation if the given guard passes, otherwise do
---   nothing.The guard raising an error counts as failure as far as this
+--   nothing. The guard raising an error counts as failure as far as this
 --   function is concerned.
 --   Corresponds to 'CM.when'.
 when :: Guard g => g -> Shell () -> Shell ()
