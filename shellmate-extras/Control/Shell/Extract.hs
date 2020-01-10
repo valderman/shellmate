@@ -123,7 +123,7 @@ extractCmd :: FilePath -> Maybe (FilePath, [String])
 extractCmd f =
   case defaultMimeLookup (T.pack f) of
     "application/x-7z-compressed"       -> Just ("7z", ["x"])
-    "application/zip"                   -> Just ("unzip", [])
+    "application/zip"                   -> Just ("unzip", ["-o"])
     "application/x-rar-compressed"      -> Just ("unrar", ["x"])
     "application/x-tar"                 -> Just ("tar", ["-xf"])
     "application/x-tgz"                 -> Just ("tar", ["-xzf"])
