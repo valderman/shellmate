@@ -1,5 +1,5 @@
 name:                shellmate-extras
-version:             0.3.4.2
+version:             0.3.4.3
 synopsis:            Extra functionality for shellmate.
 description:         HTTP downloads and parsing for various file formats.
 homepage:            https://github.com/valderman/shellmate

@@ -2,6 +2,8 @@ name:                shellmate
 version:             0.3.4.3
 synopsis:            Simple interface for shell scripting in Haskell.
 description:         Monadic EDSL for writing cross-platform shell scripts in Haskell.
+                     Note that programs using shellmate should be built with
+                     the -threaded flag to avoid deadlocks.
 homepage:            https://github.com/valderman/shellmate
 license:             BSD3
 license-file:        LICENSE
