@@ -7,6 +7,7 @@ module Control.Shell.Internal
   , exit, run, try, getEnv, inEnv, unsafeLiftIO, (|>)
   ) where
 import Control.Monad (when, ap, forM)
+import Control.Monad.Fail
 import qualified Control.Concurrent as Conc
 import qualified Control.Exception as Ex
 import qualified System.Exit as Exit
@@ -58,7 +59,9 @@ instance Applicative Shell where
 instance Monad Shell where
   return = Lift . return
   (>>=)  = Bind
-  fail   = Fail
+
+instance MonadFail Shell where
+  fail = Fail
 
 -- | Lift an IO computation into a shell. The lifted computation is not
 --   thread-safe, and should thus absolutely not use environment variables,
